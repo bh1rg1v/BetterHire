@@ -15,6 +15,7 @@ const formSchema = new mongoose.Schema(
       required: true,
     },
     name: { type: String, required: true, trim: true },
+    formUrl: { type: String, required: true, unique: true, lowercase: true },
     /** JSON schema: { fields: [ { id, type, label, required, placeholder?, options? } ] } */
     schema: {
       type: mongoose.Schema.Types.Mixed,
@@ -26,6 +27,7 @@ const formSchema = new mongoose.Schema(
 );
 
 formSchema.index({ organizationId: 1, createdAt: -1 });
+formSchema.index({ formUrl: 1 });
 
 module.exports = mongoose.model('Form', formSchema);
 module.exports.FORM_FIELD_TYPES = FORM_FIELD_TYPES;

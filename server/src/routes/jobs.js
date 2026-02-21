@@ -39,6 +39,24 @@ router.get('/', async (req, res) => {
  * GET /api/jobs/:id
  * Public. Single job (published only).
  */
+router.get('/url/:positionUrl', async (req, res) => {
+  const position = await Position.findOne({
+    positionUrl: req.params.positionUrl,
+  })
+    .populate('organizationId', 'name slug')
+    .populate('assignedManagerId', 'name username')
+    .populate('formId', 'formUrl')
+    .lean();
+  if (!position) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  const { organizationId, ...job } = position;
+  res.json({
+    job: { ...job, organization: organizationId },
+    organization: organizationId,
+  });
+});
+
 router.get('/:id', async (req, res) => {
   const position = await Position.findOne({
     _id: req.params.id,

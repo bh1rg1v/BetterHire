@@ -6,6 +6,7 @@ import * as api from '../api/client';
 
 const REGISTER_TYPES = [
   { value: 'applicant', label: 'Candidate (Applicant)' },
+  { value: 'manager', label: 'Hiring Manager' },
   { value: 'org', label: 'Organization (Admin)' },
 ];
 
@@ -77,6 +78,19 @@ export default function Register() {
     }
     if (type === 'org' && !orgName.trim()) {
       setErr('Organization name is required');
+      return;
+    }
+    if (type === 'manager') {
+      setSubmitting(true);
+      try {
+        const payload = { type, email, password, name: name.trim(), username: derivedUsername };
+        await register(payload);
+        navigate('/join-organization', { replace: true });
+      } catch (e) {
+        setErr(e.message || 'Registration failed');
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
     setSubmitting(true);

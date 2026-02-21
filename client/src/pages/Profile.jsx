@@ -9,6 +9,7 @@ import * as api from '../api/client';
 export default function Profile() {
   const { user, refreshUser } = useAuth();
   const { theme } = useTheme();
+  const [name, setName] = useState('');
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
   const [phone, setPhone] = useState('');
@@ -52,6 +53,9 @@ export default function Profile() {
   };
 
   useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+    }
     if (user?.profile) {
       setHeadline(user.profile.headline || '');
       setBio(user.profile.bio || '');
@@ -69,6 +73,7 @@ export default function Profile() {
       await api.api('/users/me', {
         method: 'PATCH',
         body: {
+          name,
           profile: { headline, bio, phone, resumeUrl, visibility },
         },
       });
@@ -136,6 +141,16 @@ export default function Profile() {
       </div>
       <form onSubmit={handleSubmit} style={s.form}>
         {message && <div style={s.message}>{message}</div>}
+        <div style={s.formGroup}>
+          <label style={s.label}>Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your full name"
+            style={s.input}
+          />
+        </div>
         <div style={s.formGroup}>
           <label style={s.label}>Headline</label>
           <input

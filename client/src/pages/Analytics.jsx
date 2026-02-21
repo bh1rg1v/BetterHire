@@ -55,7 +55,8 @@ export default function Analytics() {
   }
 
   const s = {
-    title: { fontSize: '2rem', fontWeight: 600, marginBottom: theme.spacing.xl, color: theme.colors.text },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.xl },
+    title: { fontSize: '2rem', fontWeight: 600, color: theme.colors.text, margin: 0 },
     error: { color: theme.colors.danger, marginBottom: theme.spacing.lg, padding: theme.spacing.md, background: `${theme.colors.danger}20`, border: `1px solid ${theme.colors.danger}` },
     btn: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, border: 'none', color: '#fff', cursor: 'pointer', fontFamily: theme.fonts.body, fontWeight: 500, marginBottom: theme.spacing.xl },
     section: { marginBottom: theme.spacing.xl, padding: theme.spacing.lg, background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}` },
@@ -76,9 +77,11 @@ export default function Analytics() {
 
   return (
     <DashboardLayout sidebar={<Sidebar items={navItems} />}>
-      <h1 style={s.title}>Analytics</h1>
+      <div style={s.header}>
+        <h1 style={s.title}>Analytics</h1>
+        <button type="button" onClick={exportCsv} style={s.btn}>Export Applications (CSV)</button>
+      </div>
       {error && <div style={s.error}>{error}</div>}
-      <button type="button" onClick={exportCsv} style={s.btn}>Export Applications (CSV)</button>
       {loading ? <p>Loading...</p> : (
         <>
           <section style={s.section}>

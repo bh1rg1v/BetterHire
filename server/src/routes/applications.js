@@ -9,20 +9,27 @@ const router = express.Router();
 
 /**
  * POST /api/applications
- * Applicant submits application form for a position. Body: { positionId, data }
+ * Applicant submits application form for a position. Body: { positionId, data } or { formId, data }
  */
 router.post('/', requireAuth, requireRole([ROLES.APPLICANT]), async (req, res, next) => {
   try {
-    const { positionId, data, resumeUrl } = req.body;
-    if (!positionId) return res.status(400).json({ error: 'positionId is required' });
+    const { positionId, formId, data, resumeUrl } = req.body;
+    if (!positionId && !formId) return res.status(400).json({ error: 'positionId or formId is required' });
     if (!data || typeof data !== 'object') return res.status(400).json({ error: 'data is required' });
 
-    const position = await Position.findById(positionId).populate('formId');
-    if (!position) return res.status(404).json({ error: 'Position not found' });
-    if (position.status !== 'published') return res.status(400).json({ error: 'Position is not open for applications' });
-    if (!position.formId) return res.status(400).json({ error: 'This position has no application form' });
+    let form, position;
+    
+    if (positionId) {
+      position = await Position.findById(positionId).populate('formId');
+      if (!position) return res.status(404).json({ error: 'Position not found' });
+      if (position.status !== 'published') return res.status(400).json({ error: 'Position is not open for applications' });
+      if (!position.formId) return res.status(400).json({ error: 'This position has no application form' });
+      form = await Form.findById(position.formId._id || position.formId);
+    } else {
+      form = await Form.findById(formId);
+      if (!form) return res.status(400).json({ error: 'Form not found' });
+    }
 
-    const form = await Form.findById(position.formId._id || position.formId);
     if (!form) return res.status(400).json({ error: 'Form not found' });
 
     const schema = form.schema || { fields: [] };
@@ -39,15 +46,17 @@ router.post('/', requireAuth, requireRole([ROLES.APPLICANT]), async (req, res, n
     }
     if (errors.length) return res.status(400).json({ error: 'Validation failed', details: errors });
 
-    const existing = await FormSubmission.findOne({
-      positionId: position._id,
-      applicantId: req.user._id,
-    });
-    if (existing) return res.status(409).json({ error: 'You have already applied to this position' });
+    if (position) {
+      const existing = await FormSubmission.findOne({
+        positionId: position._id,
+        applicantId: req.user._id,
+      });
+      if (existing) return res.status(409).json({ error: 'You have already applied to this position' });
+    }
 
     const submission = await FormSubmission.create({
       formId: form._id,
-      positionId: position._id,
+      positionId: position?._id || null,
       applicantId: req.user._id,
       data: normalizedData,
       resumeUrl: resumeUrl ? String(resumeUrl).trim() : '',
@@ -67,7 +76,7 @@ router.post('/', requireAuth, requireRole([ROLES.APPLICANT]), async (req, res, n
  */
 router.get('/me', requireAuth, requireRole([ROLES.APPLICANT]), async (req, res) => {
   const submissions = await FormSubmission.find({ applicantId: req.user._id })
-    .populate('positionId', 'title status testId')
+    .populate({ path: 'positionId', select: 'title status testId', populate: { path: 'organizationId', select: 'name' } })
     .populate('formId', 'name')
     .sort({ createdAt: -1 })
     .lean();
@@ -88,6 +97,28 @@ router.get('/position/:positionId/form', requireAuth, async (req, res) => {
   res.json({
     position: { _id: position._id, title: position.title },
     form: { _id: form._id, name: form.name, schema: form.schema },
+  });
+});
+
+/**
+ * GET /api/applications/form/:formUrl
+ * Get form schema by formUrl (for standalone form application).
+ */
+router.get('/form/:formUrl', async (req, res) => {
+  const form = await Form.findOne({ formUrl: req.params.formUrl })
+    .populate('organizationId', 'name')
+    .select('name schema organizationId')
+    .lean();
+  if (!form) return res.status(404).json({ error: 'Form not found' });
+  
+  const position = await Position.findOne({ formId: form._id, status: 'published' })
+    .select('title')
+    .lean();
+  
+  res.json({
+    form: { _id: form._id, name: form.name, schema: form.schema },
+    organization: form.organizationId,
+    position: position ? { title: position.title } : null,
   });
 });
 

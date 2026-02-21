@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { ROLES, ALL_ROLES, isOrgRole } = require('../constants/roles');
+const { ROLES, ALL_ROLES } = require('../constants/roles');
 
 const userSchema = new mongoose.Schema(
   {
@@ -57,9 +57,9 @@ userSchema.statics.hashPassword = function (plainPassword) {
 };
 
 userSchema.pre('validate', function (next) {
-  if (isOrgRole(this.role) && !this.organizationId) {
-    next(new Error('Organization is required for Admin and Manager roles'));
-  } else if (!isOrgRole(this.role) && this.organizationId) {
+  if (this.role === ROLES.ADMIN && !this.organizationId) {
+    next(new Error('Organization is required for Admin role'));
+  } else if (this.role === ROLES.APPLICANT && this.organizationId) {
     this.organizationId = undefined;
   }
   next();

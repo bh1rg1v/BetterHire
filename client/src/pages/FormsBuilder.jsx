@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Sidebar } from '../components/layout/Sidebar';
@@ -10,14 +11,11 @@ const FIELD_TYPES = ['text', 'email', 'number', 'textarea', 'select', 'checkbox'
 export default function FormsBuilder() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [name, setName] = useState('');
-  const [fields, setFields] = useState([]);
-  const [saving, setSaving] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
 
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
 
@@ -54,115 +52,53 @@ export default function FormsBuilder() {
 
   useEffect(() => { load(); }, [load]);
 
-  function openCreate() {
-    setEditingId(null);
-    setName('');
-    setFields([{ id: 'f1', type: 'text', label: 'Field 1', required: false, placeholder: '', options: [] }]);
-    setShowModal(true);
-  }
-
-  function openEdit(form) {
-    setEditingId(form._id);
-    setName(form.name);
-    setFields((form.schema?.fields || []).length ? form.schema.fields : [{ id: 'f1', type: 'text', label: 'Field 1', required: false }]);
-    setShowModal(true);
-  }
-
-  function addField() {
-    setFields((f) => [...f, { id: `f${Date.now()}`, type: 'text', label: `Field ${f.length + 1}`, required: false, options: [] }]);
-  }
-
-  function updateField(index, key, value) {
-    setFields((f) => f.map((field, i) => (i === index ? { ...field, [key]: value } : field)));
-  }
-
-  function removeField(index) {
-    setFields((f) => f.filter((_, i) => i !== index));
-  }
-
-  async function handleSave(e) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setSaving(true);
-    setError('');
-    try {
-      const schema = { fields };
-      if (editingId) {
-        await api.api(`/organizations/me/forms/${editingId}`, { method: 'PATCH', body: { name: name.trim(), schema } });
-      } else {
-        await api.api('/organizations/me/forms', { method: 'POST', body: { name: name.trim(), schema } });
-      }
-      setShowModal(false);
-      load();
-    } catch (e) {
-      setError(e.message || 'Save failed');
-    } finally {
-      setSaving(false);
-    }
+  function copyUrl(formUrl) {
+    const url = `${window.location.origin}/apply/form/${formUrl}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(formUrl);
+    setTimeout(() => setCopiedId(null), 2000);
   }
 
   if (!canEdit) return null;
 
   const s = {
-    title: { fontSize: '2rem', fontWeight: 600, marginBottom: theme.spacing.xl },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.xl },
+    title: { fontSize: '2rem', fontWeight: 600, color: theme.colors.text, margin: 0 },
     error: { color: theme.colors.danger, marginBottom: theme.spacing.lg, padding: theme.spacing.md, background: `${theme.colors.danger}20` },
     btn: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, border: 'none', color: '#fff', cursor: 'pointer', fontFamily: theme.fonts.body, fontWeight: 500, marginBottom: theme.spacing.lg },
     list: { listStyle: 'none', padding: 0 },
     listItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.md, background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}`, marginBottom: theme.spacing.sm },
-    btnSmall: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body },
+    btnSmall: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body, textDecoration: 'none', display: 'inline-block', marginLeft: theme.spacing.sm },
     btnDanger: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.danger, border: 'none', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body },
-    modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-    modal: { background: theme.colors.bgCard, padding: theme.spacing.xl, maxWidth: '600px', width: '90%', maxHeight: '90vh', overflow: 'auto', border: `1px solid ${theme.colors.border}` },
-    modalTitle: { fontSize: '1.5rem', fontWeight: 600, marginBottom: theme.spacing.lg },
-    input: { display: 'block', width: '100%', marginBottom: theme.spacing.sm, padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
-    select: { padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
-    fieldRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.md, padding: theme.spacing.md, background: theme.colors.bg },
-    actions: { marginTop: theme.spacing.lg, display: 'flex', gap: theme.spacing.md, justifyContent: 'flex-end' },
-    btnSecondary: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontFamily: theme.fonts.body },
   };
 
   return (
     <DashboardLayout sidebar={<Sidebar items={getNavItems()} />}>
-      <h1 style={s.title}>Form Builder</h1>
+      <div style={s.header}>
+        <h1 style={s.title}>Form Builder</h1>
+        <button type="button" onClick={() => navigate('/dashboard/forms/create')} style={s.btn}>Create Form</button>
+      </div>
       {error && <div style={s.error}>{error}</div>}
-      <button type="button" onClick={openCreate} style={s.btn}>Create Form</button>
-      {loading ? <p>Loading...</p> : (
+      {loading ? <p>Loading...</p> : forms.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
+          <p style={{ fontSize: '1.25rem', color: theme.colors.textMuted, marginBottom: theme.spacing.lg }}>No forms created yet</p>
+          <button type="button" onClick={() => navigate('/dashboard/forms/create')} style={s.btn}>Create First Form</button>
+        </div>
+      ) : (
         <ul style={s.list}>
           {forms.map((f) => (
             <li key={f._id} style={s.listItem}>
               <span>{f.name}</span>
-              <button type="button" onClick={() => openEdit(f)} style={s.btnSmall}>Edit</button>
+              <div>
+                <button type="button" onClick={() => copyUrl(f.formUrl)} style={s.btnSmall}>
+                  {copiedId === f.formUrl ? 'URL Copied!' : 'Copy URL'}
+                </button>
+                <Link to={`/dashboard/forms/${f.formUrl}/submissions`} style={s.btnSmall}>View Applicants</Link>
+                <Link to={`/dashboard/forms/${f.formUrl}/edit`} style={s.btnSmall}>Edit</Link>
+              </div>
             </li>
           ))}
         </ul>
-      )}
-      {showModal && (
-        <div style={s.modalOverlay} onClick={() => setShowModal(false)}>
-          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={s.modalTitle}>{editingId ? 'Edit Form' : 'Create Form'}</h2>
-            <form onSubmit={handleSave}>
-              <input type="text" placeholder="Form name" value={name} onChange={(e) => setName(e.target.value)} required style={s.input} />
-              {fields.map((field, i) => (
-                <div key={field.id} style={s.fieldRow}>
-                  <select value={field.type} onChange={(e) => updateField(i, 'type', e.target.value)} style={s.select}>
-                    {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <input type="text" placeholder="Label" value={field.label} onChange={(e) => updateField(i, 'label', e.target.value)} style={s.input} />
-                  <label><input type="checkbox" checked={field.required} onChange={(e) => updateField(i, 'required', e.target.checked)} /> Required</label>
-                  {(field.type === 'select' || field.type === 'radio') && (
-                    <input type="text" placeholder="Options (comma-separated)" value={Array.isArray(field.options) ? field.options.join(', ') : ''} onChange={(e) => updateField(i, 'options', e.target.value.split(',').map((x) => x.trim()).filter(Boolean))} style={s.input} />
-                  )}
-                  <button type="button" onClick={() => removeField(i)} style={s.btnDanger}>Remove</button>
-                </div>
-              ))}
-              <button type="button" onClick={addField} style={s.btn}>Add Field</button>
-              <div style={s.actions}>
-                <button type="button" onClick={() => setShowModal(false)} style={s.btnSecondary}>Cancel</button>
-                <button type="submit" disabled={saving} style={s.btn}>{saving ? 'Saving...' : 'Save'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </DashboardLayout>
   );

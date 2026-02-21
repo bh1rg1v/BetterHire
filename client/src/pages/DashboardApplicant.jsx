@@ -94,13 +94,23 @@ export default function DashboardApplicant() {
                 return (
                   <div key={sub._id} style={s.card}>
                     <div style={s.cardHeader}>
-                      <h3 style={s.cardTitle}>{sub.positionId?.title}</h3>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '0.875rem', color: theme.colors.textMuted, marginBottom: theme.spacing.xs }}>Company</p>
+                        <h3 style={s.cardTitle}>{sub.positionId?.organizationId?.name || 'N/A'}</h3>
+                      </div>
                       <span style={{ ...s.badge, background: `${getStatusColor(sub.status)}20`, color: getStatusColor(sub.status) }}>
                         {STATUS_LABELS[sub.status] || sub.status}
                       </span>
                     </div>
-                    <p style={s.cardDate}>Applied {new Date(sub.createdAt).toLocaleDateString()}</p>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: theme.colors.textMuted, marginBottom: theme.spacing.xs }}>Position</p>
+                    <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: 500, marginBottom: theme.spacing.md }}>{sub.positionId?.title || 'N/A'}</p>
+                    <p style={s.cardDate}>Applied on {new Date(sub.createdAt).toLocaleDateString()}</p>
                     
+                    <div style={{ display: 'flex', gap: theme.spacing.sm, marginBottom: theme.spacing.md }}>
+                      <button onClick={() => window.open(`/dashboard/submissions/${sub._id}`, '_blank')} style={{ ...s.testBtn, background: theme.colors.bgHover, color: theme.colors.text, border: `1px solid ${theme.colors.border}` }}>
+                        View Application
+                      </button>
+                    </div>
                     {canTakeTest && (
                       <Link to={`/test/${posId}`} style={s.testBtn}>
                         Take Test

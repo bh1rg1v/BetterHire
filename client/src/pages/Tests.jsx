@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Sidebar } from '../components/layout/Sidebar';
@@ -8,25 +9,16 @@ import * as api from '../api/client';
 export default function Tests() {
   const { user } = useAuth();
   const [tests, setTests] = useState([]);
-  const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [title, setTitle] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState(30);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [saving, setSaving] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
 
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
 
   const load = useCallback(async () => {
     try {
-      const [testsRes, questionsRes] = await Promise.all([
-        api.api('/organizations/me/tests'),
-        api.api('/organizations/me/questions'),
-      ]);
-      setTests(testsRes.tests || []);
-      setQuestions(questionsRes.questions || []);
+      const res = await api.api('/organizations/me/tests');
+      setTests(res.tests || []);
     } catch (e) {
       setError(e.message || 'Failed to load');
     } finally {
@@ -36,37 +28,11 @@ export default function Tests() {
 
   useEffect(() => { load(); }, [load]);
 
-  function toggleQuestion(id) {
-    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!title.trim()) return;
-    if (selectedIds.length === 0) {
-      setError('Select at least one question');
-      return;
-    }
-    setError('');
-    setSaving(true);
-    try {
-      await api.api('/organizations/me/tests', {
-        method: 'POST',
-        body: {
-          title: title.trim(),
-          durationMinutes: Number(durationMinutes) || 0,
-          questions: selectedIds.map((qid, i) => ({ questionId: qid, order: i, points: 1 })),
-        },
-      });
-      setShowModal(false);
-      setTitle('');
-      setSelectedIds([]);
-      load();
-    } catch (e) {
-      setError(e.message || 'Save failed');
-    } finally {
-      setSaving(false);
-    }
+  function copyTestUrl(test) {
+    const url = `${window.location.origin}/test/${test.testUrl}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(test._id);
+    setTimeout(() => setCopiedId(null), 2000);
   }
 
   const { theme } = useTheme();
@@ -80,11 +46,13 @@ export default function Tests() {
   if (!canEdit) return <DashboardLayout sidebar={<Sidebar items={navItems} />}><div style={{ padding: '2rem' }}><p>Permission required.</p></div></DashboardLayout>;
 
   const s = {
-    title: { fontSize: '2rem', fontWeight: 600, marginBottom: theme.spacing.xl, color: theme.colors.text },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.xl },
+    title: { fontSize: '2rem', fontWeight: 600, color: theme.colors.text, margin: 0 },
     error: { color: theme.colors.danger, marginBottom: theme.spacing.lg, padding: theme.spacing.md, background: `${theme.colors.danger}20`, border: `1px solid ${theme.colors.danger}` },
-    btn: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, border: 'none', color: '#fff', cursor: 'pointer', fontFamily: theme.fonts.body, fontWeight: 500, marginBottom: theme.spacing.xl },
+    btn: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, border: 'none', color: '#fff', cursor: 'pointer', fontFamily: theme.fonts.body, fontWeight: 500, marginBottom: theme.spacing.xl, textDecoration: 'none', display: 'inline-block' },
     list: { listStyle: 'none', padding: 0 },
-    listItem: { marginBottom: theme.spacing.md, padding: theme.spacing.lg, background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}` },
+    listItem: { marginBottom: theme.spacing.md, padding: theme.spacing.lg, background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    btnEdit: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontFamily: theme.fonts.body, textDecoration: 'none', display: 'inline-block' },
     modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
     modal: { background: theme.colors.bgCard, padding: theme.spacing.xl, maxWidth: '520px', width: '90%', maxHeight: '90vh', overflow: 'auto', border: `1px solid ${theme.colors.border}` },
     modalTitle: { fontSize: '1.5rem', fontWeight: 600, marginBottom: theme.spacing.lg, color: theme.colors.text },
@@ -99,42 +67,33 @@ export default function Tests() {
 
   return (
     <DashboardLayout sidebar={<Sidebar items={navItems} />}>
-      <h1 style={s.title}>Tests</h1>
+      <div style={s.header}>
+        <h1 style={s.title}>Tests</h1>
+        <Link to="/dashboard/tests/create" style={s.btn}>Create Test</Link>
+      </div>
       {error && <div style={s.error}>{error}</div>}
-      <button type="button" onClick={() => setShowModal(true)} style={s.btn}>Create Test</button>
-      {loading ? <p>Loading...</p> : (
+      {loading ? <p>Loading...</p> : tests.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
+          <p style={{ fontSize: '1.25rem', color: theme.colors.textMuted, marginBottom: theme.spacing.lg }}>No tests created yet</p>
+          <Link to="/dashboard/tests/create" style={s.btn}>Create First Test</Link>
+        </div>
+      ) : (
         <ul style={s.list}>
           {tests.map((t) => (
             <li key={t._id} style={s.listItem}>
-              <strong>{t.title}</strong> - {t.durationMinutes} min - {t.questions?.length || 0} questions
+              <div>
+                <strong>{t.title}</strong> - {t.durationMinutes} min - {t.questions?.length || 0} questions
+              </div>
+              <div style={{ display: 'flex', gap: theme.spacing.sm }}>
+                <Link to={`/test/${t.testUrl}`} target="_blank" style={s.btnEdit}>Preview</Link>
+                <button type="button" onClick={() => copyTestUrl(t)} style={s.btnEdit}>
+                  {copiedId === t._id ? 'Copied!' : 'Copy URL'}
+                </button>
+                <Link to={`/dashboard/tests/${t._id}/edit`} style={s.btnEdit}>Edit</Link>
+              </div>
             </li>
           ))}
         </ul>
-      )}
-      {showModal && (
-        <div style={s.modalOverlay} onClick={() => setShowModal(false)}>
-          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={s.modalTitle}>Create Test</h2>
-            <form onSubmit={handleSubmit}>
-              <input type="text" placeholder="Test title" value={title} onChange={(e) => setTitle(e.target.value)} required style={s.input} />
-              <label style={s.label}>
-                Duration (minutes):
-                <input type="number" min={0} value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} style={s.inputNumber} />
-              </label>
-              <p style={{ color: theme.colors.text, marginBottom: theme.spacing.sm }}>Select questions:</p>
-              {questions.map((q) => (
-                <label key={q._id} style={s.checkboxLabel}>
-                  <input type="checkbox" checked={selectedIds.includes(q._id)} onChange={() => toggleQuestion(q._id)} />
-                  {' '}[{q.type}] {q.questionText?.slice(0, 60)}...
-                </label>
-              ))}
-              <div style={s.actions}>
-                <button type="button" onClick={() => setShowModal(false)} style={s.btnCancel}>Cancel</button>
-                <button type="submit" disabled={saving} style={s.btnPrimary}>{saving ? 'Saving...' : 'Create'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </DashboardLayout>
   );

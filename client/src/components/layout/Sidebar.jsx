@@ -29,6 +29,7 @@ export function Sidebar({ items }) {
       display: 'flex',
       flexDirection: 'column',
       gap: theme.spacing.xs,
+      flex: 1,
     },
     link: {
       display: 'flex',
@@ -55,7 +56,7 @@ export function Sidebar({ items }) {
     <aside style={styles.sidebar}>
       <div style={styles.brand}>BetterHire</div>
       <nav style={styles.nav}>
-        {items.map((item) => (
+        {items.slice(0, -1).map((item) => (
           <Link
             key={item.path}
             to={item.path}
@@ -68,6 +69,21 @@ export function Sidebar({ items }) {
             {item.label}
           </Link>
         ))}
+        <div style={{ marginTop: 'auto' }}>
+          {items.slice(-1).map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              style={{
+                ...styles.link,
+                ...(location.pathname === item.path ? styles.linkActive : {}),
+              }}
+            >
+              {item.icon && <span style={styles.icon}>{item.icon}</span>}
+              {item.label}
+            </Link>
+          ))}
+        </div>
       </nav>
     </aside>
   );

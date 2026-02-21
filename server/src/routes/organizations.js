@@ -4,7 +4,7 @@ const Organization = require('../models/Organization');
 const User = require('../models/User');
 const ManagerInvite = require('../models/ManagerInvite');
 const { ROLES } = require('../constants/roles');
-const { requireOrgStaff, requireOrgAdmin } = require('../middleware/auth');
+const { requireOrgStaff, requireOrgAdmin, authenticate, requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -16,6 +16,56 @@ function toSlug(str) {
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
 }
+
+/**
+ * GET /api/organizations/list
+ * Public. List all organizations for managers to request access.
+ */
+router.get('/list', async (req, res) => {
+  const organizations = await Organization.find({})
+    .select('name slug')
+    .sort({ name: 1 })
+    .lean();
+  res.json({ organizations });
+});
+
+/**
+ * POST /api/organizations/request-access
+ * Manager requests access to an organization.
+ */
+router.post('/request-access', authenticate, requireAuth, async (req, res, next) => {
+  try {
+    const { organizationId } = req.body;
+    const userId = req.user._id;
+
+    if (!organizationId) {
+      return res.status(400).json({ error: 'Organization ID is required' });
+    }
+
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+
+    const user = await User.findById(userId);
+    if (user.role !== ROLES.MANAGER) {
+      return res.status(403).json({ error: 'Only managers can request access' });
+    }
+
+    if (user.organizationId) {
+      return res.status(400).json({ error: 'You are already part of an organization' });
+    }
+
+    user.organizationId = organizationId;
+    user.pendingApproval = true;
+    user.isActive = false;
+    await user.save();
+
+    res.json({ message: 'Access request sent successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * GET /api/organizations/check-slug?slug=acme

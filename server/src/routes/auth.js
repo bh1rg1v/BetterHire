@@ -108,7 +108,29 @@ router.post('/register', async (req, res, next) => {
       return;
     }
 
-    return res.status(400).json({ error: 'Invalid registration type. Use "org" or "applicant"' });
+    if (type === 'manager') {
+      const passwordHash = await User.hashPassword(password);
+      const user = await User.create({
+        username: normalizedUsername,
+        email: email.toLowerCase(),
+        passwordHash,
+        name: name.trim(),
+        role: ROLES.MANAGER,
+        isActive: true,
+        pendingApproval: false,
+      });
+      const token = signToken({ userId: user._id.toString() });
+      const userObj = user.toObject();
+      delete userObj.passwordHash;
+      res.status(201).json({
+        user: userObj,
+        token,
+        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+      });
+      return;
+    }
+
+    return res.status(400).json({ error: 'Invalid registration type. Use "org", "manager", or "applicant"' });
   } catch (err) {
     if (err.name === 'ValidationError') {
       return res.status(400).json({ error: err.message, details: err.errors });

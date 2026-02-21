@@ -10,9 +10,13 @@ const router = express.Router();
  * List questions for the org. Staff only.
  */
 router.get('/', requireOrgStaff, async (req, res) => {
-  const { type } = req.query;
+  const { type, tags } = req.query;
   const query = { organizationId: req.organizationId };
   if (type && QUESTION_TYPES.includes(type)) query.type = type;
+  if (tags) {
+    const tagArray = tags.split(',').map(t => t.trim()).filter(t => t);
+    if (tagArray.length > 0) query.tags = { $in: tagArray };
+  }
   const questions = await Question.find(query)
     .populate('createdBy', 'name email')
     .sort({ createdAt: -1 })
@@ -26,9 +30,10 @@ router.get('/', requireOrgStaff, async (req, res) => {
  */
 router.post('/', requireCanPostJobs, async (req, res, next) => {
   try {
-    const { type, questionText, options, maxScore } = req.body;
-    if (!QUESTION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type. Use mcq or descriptive' });
+    const { type, questionText, options, maxScore, answer, answerType, tags } = req.body;
+    if (!QUESTION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type. Use mcq, fillblank, or descriptive' });
     if (!questionText || !String(questionText).trim()) return res.status(400).json({ error: 'questionText is required' });
+    const questionTags = Array.isArray(tags) ? tags.map(t => String(t).trim()).filter(t => t) : [];
     let question;
     if (type === 'mcq') {
       if (!Array.isArray(options) || options.length < 2) return res.status(400).json({ error: 'MCQ must have at least 2 options' });
@@ -40,6 +45,19 @@ router.post('/', requireCanPostJobs, async (req, res, next) => {
         type: 'mcq',
         questionText: questionText.trim(),
         options: opts,
+        tags: questionTags,
+        maxScore: typeof maxScore === 'number' ? maxScore : 1,
+        createdBy: req.user._id,
+      });
+    } else if (type === 'fillblank') {
+      if (!answer || !String(answer).trim()) return res.status(400).json({ error: 'answer is required for fillblank' });
+      question = await Question.create({
+        organizationId: req.organizationId,
+        type: 'fillblank',
+        questionText: questionText.trim(),
+        answer: String(answer).trim(),
+        answerType: answerType === 'integer' ? 'integer' : 'string',
+        tags: questionTags,
         maxScore: typeof maxScore === 'number' ? maxScore : 1,
         createdBy: req.user._id,
       });
@@ -48,6 +66,7 @@ router.post('/', requireCanPostJobs, async (req, res, next) => {
         organizationId: req.organizationId,
         type: 'descriptive',
         questionText: questionText.trim(),
+        tags: questionTags,
         maxScore: typeof maxScore === 'number' ? maxScore : 1,
         createdBy: req.user._id,
       });
@@ -83,12 +102,17 @@ router.patch('/:id', requireCanPostJobs, async (req, res, next) => {
       organizationId: req.organizationId,
     });
     if (!question) return res.status(404).json({ error: 'Question not found' });
-    const { questionText, options, maxScore } = req.body;
+    const { questionText, options, maxScore, answer, answerType, tags } = req.body;
     if (questionText !== undefined) question.questionText = String(questionText).trim();
     if (maxScore !== undefined) question.maxScore = Number(maxScore);
+    if (tags !== undefined) question.tags = Array.isArray(tags) ? tags.map(t => String(t).trim()).filter(t => t) : [];
     if (question.type === 'mcq' && Array.isArray(options)) {
       const opts = options.map((o) => ({ text: String(o.text || ''), isCorrect: !!o.isCorrect }));
       if (opts.length >= 2 && opts.filter((o) => o.isCorrect).length === 1) question.options = opts;
+    }
+    if (question.type === 'fillblank') {
+      if (answer !== undefined) question.answer = String(answer).trim();
+      if (answerType !== undefined) question.answerType = answerType === 'integer' ? 'integer' : 'string';
     }
     await question.save();
     const populated = await Question.findById(question._id).populate('createdBy', 'name email').lean();

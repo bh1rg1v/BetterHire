@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const QUESTION_TYPES = ['mcq', 'descriptive'];
+const QUESTION_TYPES = ['mcq', 'fillblank', 'descriptive'];
 
 const questionSchema = new mongoose.Schema(
   {
@@ -21,6 +21,11 @@ const questionSchema = new mongoose.Schema(
       ],
       default: undefined,
     },
+    /** For fillblank: answer and answerType (integer or string) */
+    answer: { type: String, trim: true, default: '' },
+    answerType: { type: String, enum: ['integer', 'string'], default: 'string' },
+    /** Tags for categorization and filtering */
+    tags: [{ type: String, trim: true }],
     /** Max score for this question (used in tests). Default 1 for MCQ, configurable for descriptive. */
     maxScore: { type: Number, default: 1 },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

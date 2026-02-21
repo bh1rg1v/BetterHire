@@ -9,6 +9,8 @@ const testSchema = new mongoose.Schema(
     },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '', trim: true },
+    /** Unique URL slug for the test */
+    testUrl: { type: String, required: true, unique: true, trim: true, lowercase: true },
     /** Duration in minutes. 0 = no time limit. */
     durationMinutes: { type: Number, default: 0, min: 0 },
     /** Questions in order: [{ questionId, order, points }]. points overrides question.maxScore for this test. */
@@ -25,5 +27,6 @@ const testSchema = new mongoose.Schema(
 );
 
 testSchema.index({ organizationId: 1, createdAt: -1 });
+testSchema.index({ testUrl: 1 });
 
 module.exports = mongoose.model('Test', testSchema);

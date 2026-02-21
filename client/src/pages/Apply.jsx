@@ -5,12 +5,13 @@ import { useTheme } from '../context/ThemeContext';
 import * as api from '../api/client';
 
 export default function Apply() {
-  const { positionId } = useParams();
+  const { positionId, formUrl } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { theme } = useTheme();
   const [position, setPosition] = useState(null);
   const [form, setForm] = useState(null);
+  const [organization, setOrganization] = useState(null);
   const [data, setData] = useState({});
   const [resumeUrl, setResumeUrl] = useState('');
   const [loading, setLoading] = useState(true);
@@ -18,25 +19,43 @@ export default function Apply() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!user || user.role !== 'Applicant') {
+    const endpoint = formUrl ? `/applications/form/${formUrl}` : `/applications/position/${positionId}/form`;
+    const needsAuth = !formUrl;
+    
+    if (needsAuth && (!user || user.role !== 'Applicant')) {
       navigate('/login', { state: { from: { pathname: `/apply/${positionId}` } } });
       return;
     }
+    
     api
-      .api(`/applications/position/${positionId}/form`)
+      .api(endpoint)
       .then((res) => {
-        setPosition(res.position);
+        setPosition(res.position || null);
         setForm(res.form);
+        setOrganization(res.organization || null);
         const initial = {};
         (res.form?.schema?.fields || []).forEach((f) => { initial[f.id] = ''; });
         setData(initial);
       })
       .catch((e) => setError(e.message || 'Failed to load'))
       .finally(() => setLoading(false));
-  }, [positionId, user, navigate]);
+  }, [positionId, formUrl, user, navigate]);
 
   function setField(id, value) {
     setData((d) => ({ ...d, [id]: value }));
+  }
+
+  async function handleFileChange(id, file) {
+    if (!file) return;
+    if (file.size > 1048576) {
+      setError('File size must be less than 1MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setData((d) => ({ ...d, [id]: reader.result }));
+    };
+    reader.readAsDataURL(file);
   }
 
   async function handleSubmit(e) {
@@ -44,7 +63,10 @@ export default function Apply() {
     setSubmitting(true);
     setError('');
     try {
-      await api.api('/applications', { method: 'POST', body: { positionId, data, resumeUrl: resumeUrl.trim() || undefined } });
+      const body = { data, resumeUrl: resumeUrl.trim() || undefined };
+      if (positionId) body.positionId = positionId;
+      if (formUrl && form?._id) body.formId = form._id;
+      await api.api('/applications', { method: 'POST', body });
       navigate('/dashboard/applicant');
     } catch (e) {
       setError(e.message || 'Submit failed');
@@ -60,7 +82,7 @@ export default function Apply() {
   
   const sty = {
     page: { minHeight: '100vh', padding: '2rem', background: theme.colors.bg, color: theme.colors.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: theme.fonts.body },
-    card: { maxWidth: '600px', width: '100%', background: theme.colors.bgCard, padding: theme.spacing.xxl, border: `1px solid ${theme.colors.border}` },
+    card: { maxWidth: '800px', width: '100%', background: theme.colors.bgCard, padding: theme.spacing.xxl, border: `1px solid ${theme.colors.border}` },
     title: { fontSize: '1.75rem', fontWeight: 600, marginBottom: theme.spacing.xl, color: theme.colors.text },
     form: { display: 'flex', flexDirection: 'column', gap: theme.spacing.lg },
     formGroup: { display: 'flex', flexDirection: 'column', gap: theme.spacing.sm },
@@ -78,20 +100,25 @@ export default function Apply() {
   return (
     <div style={sty.page}>
       <div style={sty.card}>
-        <h1 style={sty.title}>Apply: {position?.title}</h1>
+        <h1 style={sty.title}>
+          {position && organization ? (
+            `Application for ${position.title} @ ${organization.name}`
+          ) : organization ? (
+            `Application for ${organization.name}`
+          ) : (
+            form?.name || 'Application Form'
+          )}
+        </h1>
         <form onSubmit={handleSubmit} style={sty.form}>
           {error && <div style={sty.error}>{error}</div>}
-          <div style={sty.formGroup}>
-            <label style={sty.label}>Resume URL (optional)</label>
-            <input type="url" placeholder="https://..." value={resumeUrl} onChange={(e) => setResumeUrl(e.target.value)} style={sty.input} />
-          </div>
           {fields.map((field) => (
             <div key={field.id} style={sty.formGroup}>
               <label style={sty.label}>{field.label}{field.required && ' *'}</label>
-              {field.type === 'textarea' && (
+              {field.type === 'file' ? (
+                <input type="file" accept={field.accept || '.pdf'} onChange={(e) => handleFileChange(field.id, e.target.files[0])} required={field.required} style={sty.input} />
+              ) : field.type === 'textarea' ? (
                 <textarea value={data[field.id] || ''} onChange={(e) => setField(field.id, e.target.value)} required={field.required} style={sty.textarea} rows={3} />
-              )}
-              {(field.type === 'select' || field.type === 'radio') && (
+              ) : (field.type === 'select' || field.type === 'radio') ? (
                 field.type === 'select' ? (
                   <select value={data[field.id] || ''} onChange={(e) => setField(field.id, e.target.value)} required={field.required} style={sty.select}>
                     <option value="">- Select -</option>
@@ -104,8 +131,7 @@ export default function Apply() {
                     ))}
                   </div>
                 )
-              )}
-              {!['textarea', 'select', 'radio'].includes(field.type) && (
+              ) : (
                 <input type={field.type} placeholder={field.placeholder} value={data[field.id] || ''} onChange={(e) => setField(field.id, e.target.value)} required={field.required} style={sty.input} />
               )}
             </div>

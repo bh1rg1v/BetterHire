@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Sidebar } from '../components/layout/Sidebar';
@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
 export default function DashboardManager() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const [positions, setPositions] = useState([]);
   const [managers, setManagers] = useState([]);
   const [forms, setForms] = useState([]);
@@ -22,11 +23,8 @@ export default function DashboardManager() {
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '', status: 'draft', assignedManagerId: '', formId: '', testId: '' });
-  const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
 
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
 
@@ -54,18 +52,12 @@ export default function DashboardManager() {
     if (!user || (user.role !== 'Admin' && user.role !== 'Manager')) return;
     setError('');
     try {
-      const [orgRes, positionsRes, managersRes, formsRes, testsRes] = await Promise.all([
+      const [orgRes, positionsRes] = await Promise.all([
         api.api('/organizations/me'),
         api.api(`/organizations/me/positions${statusFilter ? `?status=${statusFilter}` : ''}`),
-        api.api('/organizations/me/managers'),
-        api.api('/organizations/me/forms').catch(() => ({ forms: [] })),
-        api.api('/organizations/me/tests').catch(() => ({ tests: [] })),
       ]);
       setOrg(orgRes.organization);
       setPositions(positionsRes.positions || []);
-      setManagers(managersRes.managers?.filter((m) => m.isActive && !m.pendingApproval) || []);
-      setForms(formsRes.forms || []);
-      setTests(testsRes.tests || []);
     } catch (e) {
       setError(e.message || 'Failed to load');
     } finally {
@@ -74,63 +66,6 @@ export default function DashboardManager() {
   }, [user, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
-
-  function openCreate() {
-    setEditingId(null);
-    setForm({ title: '', description: '', status: 'draft', assignedManagerId: '', formId: '', testId: '' });
-    setShowModal(true);
-  }
-
-  function openEdit(p) {
-    setEditingId(p._id);
-    setForm({
-      title: p.title,
-      description: p.description || '',
-      status: p.status,
-      assignedManagerId: p.assignedManagerId?._id || '',
-      formId: p.formId?._id || '',
-      testId: p.testId?._id || '',
-    });
-    setShowModal(true);
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!form.title.trim()) return;
-    setSaving(true);
-    setError('');
-    try {
-      const body = {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        status: form.status,
-        assignedManagerId: form.assignedManagerId || undefined,
-        formId: form.formId || undefined,
-        testId: form.testId || undefined,
-      };
-      if (editingId) {
-        await api.api(`/organizations/me/positions/${editingId}`, { method: 'PATCH', body });
-      } else {
-        await api.api('/organizations/me/positions', { method: 'POST', body });
-      }
-      setShowModal(false);
-      load();
-    } catch (e) {
-      setError(e.message || 'Save failed');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function setStatus(positionId, status) {
-    setError('');
-    try {
-      await api.api(`/organizations/me/positions/${positionId}`, { method: 'PATCH', body: { status } });
-      load();
-    } catch (e) {
-      setError(e.message || 'Update failed');
-    }
-  }
 
   const getStatusColor = (status) => {
     if (status === 'published') return theme.colors.success;
@@ -162,15 +97,25 @@ export default function DashboardManager() {
     btnSmall: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body, textDecoration: 'none', display: 'inline-block' },
     empty: { textAlign: 'center', padding: theme.spacing.xxl },
     emptyText: { fontSize: '1.25rem', color: theme.colors.textMuted, marginBottom: theme.spacing.lg },
-    modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-    modal: { background: theme.colors.bgCard, padding: theme.spacing.xl, maxWidth: '600px', width: '90%', maxHeight: '90vh', overflow: 'auto', border: `1px solid ${theme.colors.border}` },
+    modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: theme.spacing.lg },
+    modal: { background: theme.colors.bgCard, padding: 0, maxWidth: '95vw', width: '1400px', maxHeight: '90vh', overflow: 'hidden', border: `1px solid ${theme.colors.border}`, display: 'flex' },
+    modalLeft: { flex: 1, padding: theme.spacing.xl, overflowY: 'auto', borderRight: `1px solid ${theme.colors.border}` },
+    modalRight: { flex: 1, padding: theme.spacing.xl, overflowY: 'auto', background: theme.colors.bg },
     modalTitle: { fontSize: '1.5rem', fontWeight: 600, marginBottom: theme.spacing.lg },
     form: { display: 'flex', flexDirection: 'column', gap: theme.spacing.lg },
     formGroup: { display: 'flex', flexDirection: 'column', gap: theme.spacing.sm },
     formRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.md },
     label: { color: theme.colors.textMuted, fontSize: '0.875rem', fontWeight: 500 },
+    required: { color: theme.colors.danger },
     input: { padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
-    textarea: { padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body, resize: 'vertical' },
+    textarea: { padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body, resize: 'vertical', overflow: 'hidden' },
+    arrayInput: { display: 'flex', gap: theme.spacing.sm, marginBottom: theme.spacing.sm },
+    arrayBtn: { padding: theme.spacing.sm, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontFamily: theme.fonts.body, fontSize: '0.875rem' },
+    previewTitle: { fontSize: '2rem', fontWeight: 700, marginBottom: theme.spacing.md, color: theme.colors.text },
+    previewSection: { marginBottom: theme.spacing.lg },
+    previewLabel: { fontSize: '0.875rem', fontWeight: 600, color: theme.colors.textMuted, marginBottom: theme.spacing.xs, textTransform: 'uppercase' },
+    previewText: { color: theme.colors.text, lineHeight: 1.6 },
+    previewList: { listStyle: 'disc', paddingLeft: theme.spacing.lg, color: theme.colors.text },
     modalActions: { display: 'flex', gap: theme.spacing.md, justifyContent: 'flex-end', marginTop: theme.spacing.md },
   };
 
@@ -182,7 +127,7 @@ export default function DashboardManager() {
           {!canEdit && <p style={s.warning}>Contact Admin to get "Can post jobs" permission</p>}
         </div>
         {canEdit && (
-          <button onClick={openCreate} style={s.btnPrimary}>
+          <button onClick={() => navigate('/dashboard/positions/create')} style={s.btnPrimary}>
             Create Position
           </button>
         )}
@@ -207,7 +152,7 @@ export default function DashboardManager() {
       {loading ? <p>Loading...</p> : positions.length === 0 ? (
         <div style={s.empty}>
           <p style={s.emptyText}>No positions yet</p>
-          {canEdit && <button onClick={openCreate} style={s.btnPrimary}>Create First Position</button>}
+          {canEdit && <button onClick={() => navigate('/dashboard/positions/create')} style={s.btnPrimary}>Create First Position</button>}
         </div>
       ) : (
         <div style={s.grid}>
@@ -228,106 +173,17 @@ export default function DashboardManager() {
               <div style={s.cardActions}>
                 {canEdit && (
                   <>
-                    <button onClick={() => openEdit(p)} style={s.btnSmall}>Edit</button>
-                    <Link to={`/dashboard/positions/${p._id}/submissions`} style={s.btnSmall}>Submissions</Link>
-                    <Link to={`/dashboard/positions/${p._id}/attempts`} style={s.btnSmall}>Attempts</Link>
+                    <Link to={`/dashboard/positions/${p.positionUrl}/edit`} style={s.btnSmall}>Edit</Link>
+                    <button onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/job/${p.positionUrl}`);
+                      setCopiedId(p._id);
+                      setTimeout(() => setCopiedId(null), 2000);
+                    }} style={s.btnSmall}>{copiedId === p._id ? 'URL Copied!' : 'Copy URL'}</button>
                   </>
                 )}
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {showModal && canEdit && (
-        <div style={s.modalOverlay} onClick={() => setShowModal(false)}>
-          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={s.modalTitle}>{editingId ? 'Edit Position' : 'Create Position'}</h2>
-            <form onSubmit={handleSubmit} style={s.form}>
-              <div style={s.formGroup}>
-                <label style={s.label}>Title *</label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  required
-                  style={s.input}
-                />
-              </div>
-              <div style={s.formGroup}>
-                <label style={s.label}>Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  rows={4}
-                  style={s.textarea}
-                />
-              </div>
-              <div style={s.formRow}>
-                <div style={s.formGroup}>
-                  <label style={s.label}>Status</label>
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                    style={s.select}
-                  >
-                    {STATUS_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={s.formGroup}>
-                  <label style={s.label}>Assigned Manager</label>
-                  <select
-                    value={form.assignedManagerId}
-                    onChange={(e) => setForm((f) => ({ ...f, assignedManagerId: e.target.value }))}
-                    style={s.select}
-                  >
-                    <option value="">- None -</option>
-                    {managers.map((m) => (
-                      <option key={m._id} value={m._id}>{m.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div style={s.formRow}>
-                <div style={s.formGroup}>
-                  <label style={s.label}>Application Form</label>
-                  <select
-                    value={form.formId}
-                    onChange={(e) => setForm((f) => ({ ...f, formId: e.target.value }))}
-                    style={s.select}
-                  >
-                    <option value="">- None -</option>
-                    {forms.map((f) => (
-                      <option key={f._id} value={f._id}>{f.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={s.formGroup}>
-                  <label style={s.label}>Test</label>
-                  <select
-                    value={form.testId}
-                    onChange={(e) => setForm((f) => ({ ...f, testId: e.target.value }))}
-                    style={s.select}
-                  >
-                    <option value="">- None -</option>
-                    {tests.map((t) => (
-                      <option key={t._id} value={t._id}>{t.title}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div style={s.modalActions}>
-                <button type="button" onClick={() => setShowModal(false)} style={s.btnSecondary}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={saving} style={s.btnPrimary}>
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
     </DashboardLayout>

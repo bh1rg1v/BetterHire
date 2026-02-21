@@ -144,33 +144,6 @@ export default function DashboardAdmin() {
             </div>
           )}
 
-          <div style={s.card}>
-            <h2 style={s.cardTitle}>Invite Manager</h2>
-            <form onSubmit={handleInvite} style={s.form}>
-              <input
-                type="email"
-                placeholder="Manager email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                style={s.input}
-              />
-              <button type="submit" disabled={inviteSubmitting} style={s.btn}>
-                {inviteSubmitting ? 'Sending...' : 'Send Invite'}
-              </button>
-            </form>
-            {inviteLink && (
-              <div style={s.inviteBox}>
-                <p style={s.label}>Invite link:</p>
-                <div style={s.inviteRow}>
-                  <input readOnly value={inviteLink} style={s.input} />
-                  <button onClick={() => copyInviteLink(inviteLink)} style={s.btnSecondary}>
-                    Copy
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
           {invites.length > 0 && (
             <div style={s.card}>
               <h2 style={s.cardTitle}>Pending Invites</h2>

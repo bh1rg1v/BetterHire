@@ -1,9 +1,22 @@
 const express = require('express');
+const crypto = require('crypto');
 const Test = require('../models/Test');
 const Question = require('../models/Question');
 const { requireOrgStaff, requireCanPostJobs } = require('../middleware/auth');
 
 const router = express.Router();
+
+function generateTestUrl() {
+  return crypto.randomBytes(8).toString('hex');
+}
+
+async function ensureUniqueTestUrl(testUrl) {
+  if (!testUrl) return generateTestUrl();
+  const normalized = testUrl.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const exists = await Test.exists({ testUrl: normalized });
+  if (exists) throw new Error('Test URL already taken');
+  return normalized;
+}
 
 /**
  * GET /api/organizations/me/tests
@@ -23,8 +36,9 @@ router.get('/', requireOrgStaff, async (req, res) => {
  */
 router.post('/', requireCanPostJobs, async (req, res, next) => {
   try {
-    const { title, description, durationMinutes, questions } = req.body;
+    const { title, description, durationMinutes, questions, testUrl } = req.body;
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'Title is required' });
+    const finalTestUrl = await ensureUniqueTestUrl(testUrl);
     const questionRefs = [];
     if (Array.isArray(questions) && questions.length > 0) {
       for (let i = 0; i < questions.length; i++) {
@@ -42,6 +56,7 @@ router.post('/', requireCanPostJobs, async (req, res, next) => {
       organizationId: req.organizationId,
       title: title.trim(),
       description: String(description || '').trim(),
+      testUrl: finalTestUrl,
       durationMinutes: typeof durationMinutes === 'number' && durationMinutes >= 0 ? durationMinutes : 0,
       questions: questionRefs,
       createdBy: req.user._id,
@@ -82,10 +97,13 @@ router.patch('/:id', requireCanPostJobs, async (req, res, next) => {
       organizationId: req.organizationId,
     });
     if (!test) return res.status(404).json({ error: 'Test not found' });
-    const { title, description, durationMinutes, questions } = req.body;
+    const { title, description, durationMinutes, questions, testUrl } = req.body;
     if (title !== undefined) test.title = String(title).trim();
     if (description !== undefined) test.description = String(description).trim();
     if (typeof durationMinutes === 'number' && durationMinutes >= 0) test.durationMinutes = durationMinutes;
+    if (testUrl !== undefined && testUrl !== test.testUrl) {
+      test.testUrl = await ensureUniqueTestUrl(testUrl);
+    }
     if (Array.isArray(questions)) {
       const questionRefs = [];
       for (let i = 0; i < questions.length; i++) {
@@ -126,6 +144,37 @@ router.delete('/:id', requireCanPostJobs, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+/**
+ * GET /api/tests/url/:testUrl
+ * Public route to get test by URL
+ */
+router.get('/url/:testUrl', async (req, res) => {
+  const test = await Test.findOne({ testUrl: req.params.testUrl })
+    .populate('questions.questionId')
+    .lean();
+  if (!test) return res.status(404).json({ error: 'Test not found' });
+  const questions = test.questions.map(q => {
+    const question = q.questionId;
+    if (question.type === 'mcq') {
+      return {
+        _id: question._id,
+        type: question.type,
+        questionText: question.questionText,
+        options: question.options.map(o => ({ text: o.text })),
+        maxScore: q.points,
+      };
+    }
+    return {
+      _id: question._id,
+      type: question.type,
+      questionText: question.questionText,
+      maxScore: q.points,
+      answerType: question.answerType,
+    };
+  });
+  res.json({ test: { _id: test._id, title: test.title, durationMinutes: test.durationMinutes, questions } });
 });
 
 module.exports = router;

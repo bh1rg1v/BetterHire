@@ -19,6 +19,7 @@ const testRoutes = require('./routes/tests');
 const attemptRoutes = require('./routes/attempts');
 const orgAttemptsRoutes = require('./routes/orgAttempts');
 const jobRoutes = require('./routes/jobs');
+const testPublicRoutes = require('./routes/tests');
 const applicationRoutes = require('./routes/applications');
 const analyticsRoutes = require('./routes/analytics');
 
@@ -50,6 +51,7 @@ app.use('/api/organizations/me/attempts', authenticate, orgAttemptsRoutes);
 app.use('/api/attempts', authenticate, attemptRoutes);
 app.use('/api/invites', authenticate, inviteRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/tests', testPublicRoutes);
 app.use('/api/applications', authenticate, applicationRoutes);
 app.use('/api/organizations/me/analytics', authenticate, analyticsRoutes);
 
