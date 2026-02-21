@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { Sidebar } from '../components/layout/Sidebar';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
 
 const FIELD_TYPES = ['text', 'email', 'number', 'textarea', 'select', 'checkbox', 'radio'];
 
 export default function FormsBuilder() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { theme } = useTheme();
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -17,6 +20,26 @@ export default function FormsBuilder() {
   const [saving, setSaving] = useState(false);
 
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
+
+  const getNavItems = () => {
+    const items = [
+      { path: '/dashboard', label: 'Dashboard' },
+      ...(user?.role === 'Admin' ? [{ path: '/dashboard/admin', label: 'Organization' }] : []),
+      { path: '/dashboard/manager', label: 'Positions' },
+    ];
+    if (canEdit) {
+      items.push(
+        { path: '/dashboard/forms', label: 'Forms' },
+        { path: '/dashboard/questions', label: 'Questions' },
+        { path: '/dashboard/tests', label: 'Tests' }
+      );
+    }
+    items.push(
+      { path: '/dashboard/analytics', label: 'Analytics' },
+      { path: '/dashboard/profile', label: 'Profile' }
+    );
+    return items;
+  };
 
   const load = useCallback(async () => {
     try {
@@ -78,37 +101,45 @@ export default function FormsBuilder() {
     }
   }
 
-  if (!canEdit) {
-    return (
-      <div style={s.page}><p>Permission required.</p><Link to="/dashboard/manager">Back</Link></div>
-    );
-  }
+  if (!canEdit) return null;
+
+  const s = {
+    title: { fontSize: '2rem', fontWeight: 600, marginBottom: theme.spacing.xl },
+    error: { color: theme.colors.danger, marginBottom: theme.spacing.lg, padding: theme.spacing.md, background: `${theme.colors.danger}20` },
+    btn: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, border: 'none', color: '#fff', cursor: 'pointer', fontFamily: theme.fonts.body, fontWeight: 500, marginBottom: theme.spacing.lg },
+    list: { listStyle: 'none', padding: 0 },
+    listItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.md, background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}`, marginBottom: theme.spacing.sm },
+    btnSmall: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body },
+    btnDanger: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.danger, border: 'none', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body },
+    modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
+    modal: { background: theme.colors.bgCard, padding: theme.spacing.xl, maxWidth: '600px', width: '90%', maxHeight: '90vh', overflow: 'auto', border: `1px solid ${theme.colors.border}` },
+    modalTitle: { fontSize: '1.5rem', fontWeight: 600, marginBottom: theme.spacing.lg },
+    input: { display: 'block', width: '100%', marginBottom: theme.spacing.sm, padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
+    select: { padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
+    fieldRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.md, padding: theme.spacing.md, background: theme.colors.bg },
+    actions: { marginTop: theme.spacing.lg, display: 'flex', gap: theme.spacing.md, justifyContent: 'flex-end' },
+    btnSecondary: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontFamily: theme.fonts.body },
+  };
 
   return (
-    <div style={s.page}>
-      <header style={s.header}>
-        <Link to="/dashboard/manager" style={s.logo}>BetterHire</Link>
-        <button type="button" onClick={logout} style={s.logoutBtn}>Sign out</button>
-      </header>
-      <main style={s.main}>
-        <h1>Form builder</h1>
-        {error && <div style={s.error}>{error}</div>}
-        <button type="button" onClick={openCreate} style={s.btn}>Create form</button>
-        {loading ? <p>Loading…</p> : (
-          <ul style={s.list}>
-            {forms.map((f) => (
-              <li key={f._id} style={s.listItem}>
-                {f.name}
-                <button type="button" onClick={() => openEdit(f)} style={s.btnSmall}>Edit</button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </main>
+    <DashboardLayout sidebar={<Sidebar items={getNavItems()} />}>
+      <h1 style={s.title}>Form Builder</h1>
+      {error && <div style={s.error}>{error}</div>}
+      <button type="button" onClick={openCreate} style={s.btn}>Create Form</button>
+      {loading ? <p>Loading...</p> : (
+        <ul style={s.list}>
+          {forms.map((f) => (
+            <li key={f._id} style={s.listItem}>
+              <span>{f.name}</span>
+              <button type="button" onClick={() => openEdit(f)} style={s.btnSmall}>Edit</button>
+            </li>
+          ))}
+        </ul>
+      )}
       {showModal && (
         <div style={s.modalOverlay} onClick={() => setShowModal(false)}>
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-            <h2>{editingId ? 'Edit form' : 'Create form'}</h2>
+            <h2 style={s.modalTitle}>{editingId ? 'Edit Form' : 'Create Form'}</h2>
             <form onSubmit={handleSave}>
               <input type="text" placeholder="Form name" value={name} onChange={(e) => setName(e.target.value)} required style={s.input} />
               {fields.map((field, i) => (
@@ -124,29 +155,15 @@ export default function FormsBuilder() {
                   <button type="button" onClick={() => removeField(i)} style={s.btnDanger}>Remove</button>
                 </div>
               ))}
-              <button type="button" onClick={addField} style={s.btn}>Add field</button>
+              <button type="button" onClick={addField} style={s.btn}>Add Field</button>
               <div style={s.actions}>
-                <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+                <button type="button" onClick={() => setShowModal(false)} style={s.btnSecondary}>Cancel</button>
+                <button type="submit" disabled={saving} style={s.btn}>{saving ? 'Saving...' : 'Save'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 }
-
-const s = {
-  page: { minHeight: '100vh', background: '#0f172a', color: '#f1f5f9', padding: '1rem 2rem' },
-  header: { display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' },
-  logo: { color: '#f1f5f9', fontWeight: 700 }, logoutBtn: { padding: '0.5rem 1rem', cursor: 'pointer' },
-  main: {}, error: { color: '#f87171' }, btn: { padding: '0.5rem 1rem', marginBottom: '1rem', cursor: 'pointer' },
-  btnSmall: { marginLeft: '0.5rem', padding: '0.25rem 0.5rem', cursor: 'pointer' }, btnDanger: { marginLeft: '0.5rem', padding: '0.25rem 0.5rem', cursor: 'pointer', background: '#dc2626', color: '#fff', border: 'none' },
-  list: { listStyle: 'none', padding: 0 }, listItem: { marginBottom: '0.5rem' },
-  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  modal: { background: '#1e293b', padding: '1.5rem', borderRadius: 12, maxWidth: 560, width: '90%', maxHeight: '90vh', overflow: 'auto' },
-  input: { display: 'block', width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }, select: { marginRight: '0.5rem', padding: '0.5rem' },
-  fieldRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' },
-  actions: { marginTop: '1rem', display: 'flex', gap: '0.5rem' },
-};

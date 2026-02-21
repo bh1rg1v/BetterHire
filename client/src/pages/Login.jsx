@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Login() {
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -26,81 +28,121 @@ export default function Login() {
     }
   }
 
+  const s = {
+    page: {
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: theme.spacing.lg,
+      background: theme.colors.bg,
+      fontFamily: theme.fonts.body,
+    },
+    card: {
+      width: '100%',
+      maxWidth: '420px',
+      padding: theme.spacing.xxl,
+      background: theme.colors.bgCard,
+      border: `1px solid ${theme.colors.border}`,
+    },
+    logo: {
+      fontSize: '1.5rem',
+      fontWeight: 700,
+      color: theme.colors.primary,
+      marginBottom: theme.spacing.xl,
+      textAlign: 'center',
+    },
+    title: {
+      margin: `0 0 ${theme.spacing.sm}`,
+      color: theme.colors.text,
+      fontSize: '1.75rem',
+      fontWeight: 600,
+      textAlign: 'center',
+    },
+    subtitle: {
+      margin: `0 0 ${theme.spacing.xl}`,
+      color: theme.colors.textMuted,
+      fontSize: '0.95rem',
+      textAlign: 'center',
+    },
+    form: { display: 'flex', flexDirection: 'column', gap: theme.spacing.lg },
+    formGroup: { display: 'flex', flexDirection: 'column', gap: theme.spacing.sm },
+    label: { color: theme.colors.textMuted, fontSize: '0.875rem', fontWeight: 500 },
+    error: {
+      color: theme.colors.danger,
+      fontSize: '0.875rem',
+      padding: theme.spacing.md,
+      background: `${theme.colors.danger}20`,
+      border: `1px solid ${theme.colors.danger}`,
+    },
+    input: {
+      padding: theme.spacing.md,
+      border: `1px solid ${theme.colors.border}`,
+      background: theme.colors.bg,
+      color: theme.colors.text,
+      fontSize: '1rem',
+      fontFamily: theme.fonts.body,
+    },
+    button: {
+      padding: theme.spacing.md,
+      border: 'none',
+      background: theme.colors.primary,
+      color: '#fff',
+      fontSize: '1rem',
+      fontWeight: 600,
+      cursor: 'pointer',
+      fontFamily: theme.fonts.body,
+      transition: 'all 0.2s',
+    },
+    footer: {
+      marginTop: theme.spacing.xl,
+      color: theme.colors.textMuted,
+      fontSize: '0.9rem',
+      textAlign: 'center',
+    },
+    link: { color: theme.colors.primary, fontWeight: 500 },
+  };
+
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Sign in</h1>
-        <p style={styles.subtitle}>BetterHire</p>
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {err && <div style={styles.error}>{err}</div>}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            style={styles.input}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            style={styles.input}
-          />
-          <button type="submit" disabled={submitting} style={styles.button}>
-            {submitting ? 'Signing in…' : 'Sign in'}
+    <div style={s.page}>
+      <div style={s.card}>
+        <div style={s.logo}>BetterHire</div>
+        <h1 style={s.title}>Sign In</h1>
+        <p style={s.subtitle}>Welcome back! Please enter your credentials</p>
+        <form onSubmit={handleSubmit} style={s.form}>
+          {err && <div style={s.error}>{err}</div>}
+          <div style={s.formGroup}>
+            <label style={s.label}>Email</label>
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              style={s.input}
+            />
+          </div>
+          <div style={s.formGroup}>
+            <label style={s.label}>Password</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              style={s.input}
+            />
+          </div>
+          <button type="submit" disabled={submitting} style={s.button}>
+            {submitting ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
-        <p style={styles.footer}>
-          Don’t have an account? <Link to="/register">Register</Link>
+        <p style={s.footer}>
+          Don't have an account? <Link to="/register" style={s.link}>Create one</Link>
         </p>
       </div>
     </div>
   );
 }
-
-const styles = {
-  page: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '1rem',
-    background: 'linear-gradient(160deg, #0f172a 0%, #1e293b 100%)',
-  },
-  card: {
-    width: '100%',
-    maxWidth: 380,
-    padding: '2rem',
-    background: '#1e293b',
-    borderRadius: 12,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-  },
-  title: { margin: '0 0 0.25rem', color: '#f1f5f9', fontSize: '1.5rem' },
-  subtitle: { margin: '0 0 1.5rem', color: '#94a3b8', fontSize: '0.9rem' },
-  form: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  error: { color: '#f87171', fontSize: '0.875rem' },
-  input: {
-    padding: '0.75rem 1rem',
-    border: '1px solid #334155',
-    borderRadius: 8,
-    background: '#0f172a',
-    color: '#f1f5f9',
-    fontSize: '1rem',
-  },
-  button: {
-    padding: '0.75rem',
-    border: 'none',
-    borderRadius: 8,
-    background: '#3b82f6',
-    color: '#fff',
-    fontSize: '1rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  footer: { marginTop: '1.5rem', color: '#94a3b8', fontSize: '0.9rem' },
-};

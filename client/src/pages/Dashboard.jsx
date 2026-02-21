@@ -1,71 +1,143 @@
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { Sidebar } from '../components/layout/Sidebar';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { theme } = useTheme();
 
-  const roleLabel = user?.role === 'Admin' ? 'Organization Admin' : user?.role === 'Manager' ? 'Manager' : 'Applicant';
+  const getNavItems = () => {
+    if (user?.role === 'Admin') {
+      return [
+        { path: '/dashboard', label: 'Dashboard' },
+        { path: '/dashboard/admin', label: 'Organization' },
+        { path: '/dashboard/manager', label: 'Positions' },
+        { path: '/dashboard/forms', label: 'Forms' },
+        { path: '/dashboard/questions', label: 'Questions' },
+        { path: '/dashboard/tests', label: 'Tests' },
+        { path: '/dashboard/analytics', label: 'Analytics' },
+        { path: '/dashboard/profile', label: 'Profile' },
+      ];
+    }
+    if (user?.role === 'Manager') {
+      return [
+        { path: '/dashboard', label: 'Dashboard' },
+        { path: '/dashboard/manager', label: 'Positions' },
+        ...(user?.canPostJobs ? [
+          { path: '/dashboard/forms', label: 'Forms' },
+          { path: '/dashboard/questions', label: 'Questions' },
+          { path: '/dashboard/tests', label: 'Tests' },
+        ] : []),
+        { path: '/dashboard/analytics', label: 'Analytics' },
+        { path: '/dashboard/profile', label: 'Profile' },
+      ];
+    }
+    return [
+      { path: '/dashboard', label: 'Dashboard' },
+      { path: '/dashboard/applicant', label: 'My Applications' },
+      { path: '/jobs', label: 'Browse Jobs' },
+      { path: '/dashboard/profile', label: 'Profile' },
+    ];
+  };
+
+  const styles = {
+    title: {
+      fontSize: '2rem',
+      fontWeight: 600,
+      color: theme.colors.text,
+      marginBottom: theme.spacing.sm,
+    },
+    subtitle: {
+      color: theme.colors.textMuted,
+      marginBottom: theme.spacing.xl,
+    },
+    grid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+      gap: theme.spacing.lg,
+      marginBottom: theme.spacing.xxl,
+    },
+    card: {
+      background: theme.colors.bgCard,
+      padding: theme.spacing.lg,
+      border: `1px solid ${theme.colors.border}`,
+    },
+    cardIcon: {
+      fontSize: '2rem',
+      marginBottom: theme.spacing.md,
+    },
+    cardTitle: {
+      fontSize: '0.875rem',
+      color: theme.colors.textMuted,
+      marginBottom: theme.spacing.xs,
+      fontWeight: 500,
+    },
+    cardValue: {
+      fontSize: '1.25rem',
+      color: theme.colors.text,
+      fontWeight: 500,
+    },
+    quickLinks: {
+      marginTop: theme.spacing.xxl,
+    },
+    sectionTitle: {
+      fontSize: '1.25rem',
+      fontWeight: 600,
+      marginBottom: theme.spacing.lg,
+    },
+    linkGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+      gap: theme.spacing.md,
+    },
+    quickLink: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: theme.spacing.sm,
+      padding: theme.spacing.md,
+      background: theme.colors.bgCard,
+      border: `1px solid ${theme.colors.border}`,
+      color: theme.colors.text,
+      textDecoration: 'none',
+      transition: 'all 0.2s',
+    },
+  };
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <span style={styles.logo}>BetterHire</span>
-        <div style={styles.userRow}>
-          <span style={styles.userName}>{user?.name}</span>
-          <span style={styles.role}>{roleLabel}</span>
-          {(user?.organizationId?.name) && (
-            <span style={styles.org}> · {user.organizationId.name}</span>
-          )}
-          <button type="button" onClick={logout} style={styles.logoutBtn}>
-            Sign out
-          </button>
+    <DashboardLayout sidebar={<Sidebar items={getNavItems()} />}>
+      <h1 style={styles.title}>Dashboard</h1>
+      <p style={styles.subtitle}>Welcome back, {user?.name}</p>
+      
+      <div style={styles.grid}>
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Role</h3>
+          <p style={styles.cardValue}>{user?.role}</p>
         </div>
-      </header>
-      <main style={styles.main}>
-        <h1 style={styles.h1}>Dashboard</h1>
-        <p style={styles.p}>You’re signed in as <strong>{user?.role}</strong>.</p>
-        <div style={styles.links}>
-          {user?.role === 'Admin' && (
-            <Link to="/dashboard/admin" style={styles.link}>Organization Admin dashboard</Link>
-          )}
-          {(user?.role === 'Admin' || user?.role === 'Manager') && (
-            <Link to="/dashboard/manager" style={styles.link}>Manager dashboard (job positions)</Link>
-          )}
-          {user?.role === 'Applicant' && (
-            <Link to="/dashboard/applicant" style={styles.link}>My applications</Link>
-          )}
-          <Link to="/profile" style={styles.link}>My profile</Link>
+        
+        {user?.organizationId?.name && (
+          <div style={styles.card}>
+            <h3 style={styles.cardTitle}>Organization</h3>
+            <p style={styles.cardValue}>{user.organizationId.name}</p>
+          </div>
+        )}
+        
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Email</h3>
+          <p style={styles.cardValue}>{user?.email}</p>
         </div>
-      </main>
-    </div>
+      </div>
+
+      <div style={styles.quickLinks}>
+        <h2 style={styles.sectionTitle}>Quick Links</h2>
+        <div style={styles.linkGrid}>
+          {getNavItems().slice(1).map((item) => (
+            <a key={item.path} href={item.path} style={styles.quickLink}>
+              <span>{item.label}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }
-
-const styles = {
-  page: { minHeight: '100vh', background: '#0f172a', color: '#f1f5f9' },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '1rem 2rem',
-    borderBottom: '1px solid #334155',
-  },
-  logo: { fontWeight: 700, fontSize: '1.25rem' },
-  userRow: { display: 'flex', alignItems: 'center', gap: '0.75rem' },
-  userName: { fontWeight: 500 },
-  role: { color: '#94a3b8', fontSize: '0.9rem' },
-  org: { color: '#64748b', fontSize: '0.9rem' },
-  logoutBtn: {
-    padding: '0.5rem 1rem',
-    background: 'transparent',
-    border: '1px solid #475569',
-    borderRadius: 6,
-    color: '#94a3b8',
-    cursor: 'pointer',
-  },
-  main: { padding: '2rem' },
-  h1: { margin: '0 0 0.5rem' },
-  p: { color: '#94a3b8', margin: '0 0 1.5rem' },
-  links: { display: 'flex', flexDirection: 'column', gap: '0.5rem' },
-  link: { color: '#60a5fa' },
-};

@@ -7,26 +7,30 @@ const { signToken, authenticate, requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-/**
- * POST /api/auth/register
- * Body: { type: 'org' | 'applicant', email, password, name [, orgName ] }
- * - type 'org': creates Organization + first Admin. Requires orgName.
- * - type 'applicant': creates Applicant (no org).
- */
 router.post('/register', async (req, res, next) => {
   try {
-    const { type, email, password, name, orgName } = req.body;
+    const { type, email, password, name, orgName, username } = req.body;
 
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: 'Email, password, and name are required' });
+    if (!email || !password || !name || !username) {
+      return res.status(400).json({ error: 'Email, password, name, and username are required' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const normalizedUsername = username.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (normalizedUsername.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+
+    const existingUser = await User.findOne({ 
+      $or: [{ email: email.toLowerCase() }, { username: normalizedUsername }] 
+    });
     if (existingUser) {
-      return res.status(409).json({ error: 'Email already registered' });
+      if (existingUser.email === email.toLowerCase()) {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+      return res.status(409).json({ error: 'Username already taken' });
     }
 
     if (type === 'org') {
@@ -38,7 +42,7 @@ router.post('/register', async (req, res, next) => {
         .toLowerCase()
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9-]/g, '');
-      if (!slug) {
+      if (!slug || slug.length < 2) {
         return res.status(400).json({ error: 'Invalid organization name' });
       }
       const existingOrg = await Organization.findOne({ slug });
@@ -54,11 +58,13 @@ router.post('/register', async (req, res, next) => {
         const [user] = await User.create(
           [
             {
+              username: normalizedUsername,
               email: email.toLowerCase(),
               passwordHash,
               name: name.trim(),
               role: ROLES.ADMIN,
               organizationId: org._id,
+              canPostJobs: true,
             },
           ],
           { session }
@@ -85,6 +91,7 @@ router.post('/register', async (req, res, next) => {
     if (type === 'applicant' || !type) {
       const passwordHash = await User.hashPassword(password);
       const user = await User.create({
+        username: normalizedUsername,
         email: email.toLowerCase(),
         passwordHash,
         name: name.trim(),
@@ -106,14 +113,13 @@ router.post('/register', async (req, res, next) => {
     if (err.name === 'ValidationError') {
       return res.status(400).json({ error: err.message, details: err.errors });
     }
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'Username or email already exists' });
+    }
     next(err);
   }
 });
 
-/**
- * POST /api/auth/login
- * Body: { email, password }
- */
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -146,14 +152,19 @@ router.post('/login', async (req, res) => {
   });
 });
 
-/**
- * GET /api/auth/me
- * Returns current user (requires auth).
- */
 router.get('/me', authenticate, requireAuth, async (req, res) => {
   const user = req.user.toObject();
   delete user.passwordHash;
   res.json({ user });
+});
+
+router.get('/check-username', async (req, res) => {
+  const username = (req.query.username || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (!username || username.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters' });
+  }
+  const exists = await User.exists({ username });
+  res.json({ available: !exists, username });
 });
 
 module.exports = router;

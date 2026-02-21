@@ -122,11 +122,12 @@ router.get('/me/invites', requireOrgAdmin, async (req, res) => {
 /**
  * GET /api/organizations/me/managers
  * Org staff (Admin or Manager). List managers for the org (e.g. for assigning to positions).
+ * Includes Admin users as well.
  */
 router.get('/me/managers', requireOrgStaff, async (req, res) => {
   const managers = await User.find({
     organizationId: req.organizationId,
-    role: ROLES.MANAGER,
+    role: { $in: [ROLES.MANAGER, ROLES.ADMIN] },
   })
     .select('-passwordHash')
     .sort({ createdAt: 1 })

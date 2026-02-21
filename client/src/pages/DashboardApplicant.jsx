@@ -1,15 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { Sidebar } from '../components/layout/Sidebar';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
 
-const STATUS_LABELS = { submitted: 'Submitted', under_review: 'Under review', shortlisted: 'Shortlisted', rejected: 'Rejected', hired: 'Hired' };
+const STATUS_LABELS = { submitted: 'Submitted', under_review: 'Under Review', shortlisted: 'Shortlisted', rejected: 'Rejected', hired: 'Hired' };
 
 export default function DashboardApplicant() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { theme } = useTheme();
   const [submissions, setSubmissions] = useState([]);
   const [attemptsByPosition, setAttemptsByPosition] = useState({});
   const [loading, setLoading] = useState(true);
+
+  const navItems = [
+    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/dashboard/applicant', label: 'My Applications' },
+    { path: '/jobs', label: 'Browse Jobs' },
+    { path: '/dashboard/profile', label: 'Profile' },
+  ];
 
   useEffect(() => {
     if (user?.role !== 'Applicant') return;
@@ -35,65 +46,78 @@ export default function DashboardApplicant() {
     });
   }, [user, submissions]);
 
+  const getStatusColor = (status) => {
+    if (status === 'hired') return theme.colors.success;
+    if (status === 'rejected') return theme.colors.danger;
+    if (status === 'shortlisted') return theme.colors.info;
+    if (status === 'under_review') return theme.colors.warning;
+    return theme.colors.textMuted;
+  };
+
+  const s = {
+    title: { fontSize: '2rem', fontWeight: 600, marginBottom: theme.spacing.sm },
+    subtitle: { color: theme.colors.textMuted, marginBottom: theme.spacing.xl },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: theme.spacing.lg },
+    card: { background: theme.colors.bgCard, padding: theme.spacing.xl, border: `1px solid ${theme.colors.border}` },
+    cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: theme.spacing.md, marginBottom: theme.spacing.md },
+    cardTitle: { fontSize: '1.25rem', fontWeight: 600, margin: 0 },
+    badge: { padding: `${theme.spacing.xs} ${theme.spacing.md}`, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap' },
+    cardDate: { color: theme.colors.textMuted, fontSize: '0.875rem', marginBottom: theme.spacing.lg },
+    testBtn: { display: 'inline-flex', alignItems: 'center', gap: theme.spacing.sm, padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, color: '#fff', textDecoration: 'none', fontWeight: 500, transition: 'all 0.2s' },
+    testInfo: { color: theme.colors.textMuted, fontSize: '0.9rem' },
+    empty: { textAlign: 'center', padding: theme.spacing.xxl },
+    emptyText: { fontSize: '1.25rem', color: theme.colors.textMuted, marginBottom: theme.spacing.lg },
+    emptyLink: { display: 'inline-block', padding: `${theme.spacing.md} ${theme.spacing.xl}`, background: theme.colors.primary, color: '#fff', textDecoration: 'none', fontWeight: 500 },
+  };
+
   return (
-    <div style={s.page}>
-      <header style={s.header}>
-        <Link to="/dashboard" style={s.logo}>BetterHire</Link>
-        <nav style={s.nav}>
-          <Link to="/profile" style={s.navLink}>Profile</Link>
-          <Link to="/jobs" style={s.navLink}>Browse jobs</Link>
-          <button type="button" onClick={logout} style={s.logoutBtn}>Sign out</button>
-        </nav>
-      </header>
-      <main style={s.main}>
-        <h1>My applications</h1>
-        <p style={s.muted}>Track status and take assigned tests.</p>
-        {loading ? <p>Loading…</p> : (
-          <ul style={s.list}>
-            {submissions.map((s) => {
-              const posId = s.positionId?._id;
-              const attempt = attemptsByPosition[posId]?.attempt;
-              const hasTest = s.positionId?.testId;
-              const canTakeTest = hasTest && (!attempt || attempt.status === 'in_progress');
-              const testDone = attempt && (attempt.status === 'submitted' || attempt.status === 'evaluated');
-              return (
-                <li key={s._id} style={s.card}>
-                  <div style={s.cardHeader}>
-                    <strong>{s.positionId?.title}</strong>
-                    <span style={s.badge(s.status)}>{STATUS_LABELS[s.status] || s.status}</span>
+    <DashboardLayout sidebar={<Sidebar items={navItems} />}>
+      <h1 style={s.title}>My Applications</h1>
+      <p style={s.subtitle}>Track your application status and complete assigned tests</p>
+
+      {loading ? <p>Loading...</p> : (
+        <>
+          {submissions.length === 0 ? (
+            <div style={s.empty}>
+              <p style={s.emptyText}>No applications yet</p>
+              <Link to="/jobs" style={s.emptyLink}>Browse Jobs</Link>
+            </div>
+          ) : (
+            <div style={s.grid}>
+              {submissions.map((sub) => {
+                const posId = sub.positionId?._id;
+                const attempt = attemptsByPosition[posId]?.attempt;
+                const hasTest = sub.positionId?.testId;
+                const canTakeTest = hasTest && (!attempt || attempt.status === 'in_progress');
+                const testDone = attempt && (attempt.status === 'submitted' || attempt.status === 'evaluated');
+
+                return (
+                  <div key={sub._id} style={s.card}>
+                    <div style={s.cardHeader}>
+                      <h3 style={s.cardTitle}>{sub.positionId?.title}</h3>
+                      <span style={{ ...s.badge, background: `${getStatusColor(sub.status)}20`, color: getStatusColor(sub.status) }}>
+                        {STATUS_LABELS[sub.status] || sub.status}
+                      </span>
+                    </div>
+                    <p style={s.cardDate}>Applied {new Date(sub.createdAt).toLocaleDateString()}</p>
+                    
+                    {canTakeTest && (
+                      <Link to={`/test/${posId}`} style={s.testBtn}>
+                        Take Test
+                      </Link>
+                    )}
+                    {testDone && (
+                      <div style={s.testInfo}>
+                        Test {attempt.status === 'evaluated' ? `completed - Score: ${attempt.totalScore ?? '-'}` : 'submitted'}
+                      </div>
+                    )}
                   </div>
-                  <p style={s.muted}>Applied {new Date(s.createdAt).toLocaleDateString()}</p>
-                  <div style={s.actions}>
-                    {canTakeTest && <Link to={`/test/${posId}`} style={s.btn}>Take test</Link>}
-                    {testDone && <span style={s.muted}>Test {attempt.status === 'evaluated' ? `completed · Score: ${attempt.totalScore != null ? attempt.totalScore : '—'}` : 'submitted'}</span>}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {!loading && submissions.length === 0 && (
-          <p>You haven't applied yet. <Link to="/jobs" style={s.link}>Browse jobs</Link> to apply.</p>
-        )}
-      </main>
-    </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </DashboardLayout>
   );
 }
-
-const s = {
-  page: { minHeight: '100vh', background: '#0f172a', color: '#f1f5f9', padding: '2rem' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' },
-  logo: { color: '#f1f5f9', fontWeight: 700, textDecoration: 'none' },
-  nav: { display: 'flex', gap: '1rem', alignItems: 'center' },
-  navLink: { color: '#94a3b8', textDecoration: 'none' },
-  logoutBtn: { padding: '0.5rem 1rem', cursor: 'pointer', background: 'transparent', border: '1px solid #475569', color: '#94a3b8', borderRadius: 6 },
-  main: {},
-  muted: { color: '#94a3b8', fontSize: '0.9rem', margin: '0.25rem 0' },
-  list: { listStyle: 'none', padding: 0 },
-  card: { marginBottom: '1rem', padding: '1rem', background: '#1e293b', borderRadius: 8 },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' },
-  badge: (status) => ({ fontSize: '0.85rem', padding: '0.2rem 0.5rem', borderRadius: 4, background: status === 'hired' ? '#166534' : status === 'rejected' ? '#991b1b' : '#334155', color: '#e2e8f0' }),
-  actions: { marginTop: '0.5rem' },
-  btn: { display: 'inline-block', padding: '0.4rem 0.75rem', background: '#3b82f6', color: '#fff', borderRadius: 6, textDecoration: 'none', fontSize: '0.9rem' },
-  link: { color: '#60a5fa' },
-};

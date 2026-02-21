@@ -48,6 +48,30 @@ router.patch('/me', authenticate, requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /api/users/profile/:username
+ * Public profile by username. No auth required.
+ */
+router.get('/profile/:username', async (req, res) => {
+  const user = await User.findOne({ username: req.params.username })
+    .select('name username profile role')
+    .lean();
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  const publicProfile = {
+    name: user.name,
+    username: user.username,
+    profile: {
+      headline: user.profile?.headline || '',
+      bio: user.profile?.bio || '',
+      phone: user.profile?.phone || '',
+      resumeUrl: user.profile?.resumeUrl || '',
+    },
+  };
+  res.json({ user: publicProfile });
+});
+
+/**
  * GET /api/users/:id/public
  * Public profile for an applicant. Only returns fields when profile.visibility === 'public'.
  */

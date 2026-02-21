@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -20,6 +21,8 @@ import Questions from './pages/Questions';
 import Tests from './pages/Tests';
 import TakeTest from './pages/TakeTest';
 import Analytics from './pages/Analytics';
+
+import PublicProfile from './pages/PublicProfile';
 
 function AppRoutes() {
   return (
@@ -64,13 +67,14 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/profile"
+        path="/dashboard/profile"
         element={
           <ProtectedRoute>
             <Profile />
           </ProtectedRoute>
         }
       />
+      <Route path="/users/:username" element={<PublicProfile />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -86,9 +90,11 @@ function GuestOnlyRoute({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { Sidebar } from '../components/layout/Sidebar';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
+  const { theme } = useTheme();
   const [headline, setHeadline] = useState('');
   const [bio, setBio] = useState('');
   const [phone, setPhone] = useState('');
@@ -11,6 +16,40 @@ export default function Profile() {
   const [visibility, setVisibility] = useState('private');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+
+  const getNavItems = () => {
+    if (user?.role === 'Admin') {
+      return [
+        { path: '/dashboard', label: 'Dashboard' },
+        { path: '/dashboard/admin', label: 'Organization' },
+        { path: '/dashboard/manager', label: 'Positions' },
+        { path: '/dashboard/forms', label: 'Forms' },
+        { path: '/dashboard/questions', label: 'Questions' },
+        { path: '/dashboard/tests', label: 'Tests' },
+        { path: '/dashboard/analytics', label: 'Analytics' },
+        { path: '/dashboard/profile', label: 'Profile' },
+      ];
+    }
+    if (user?.role === 'Manager') {
+      return [
+        { path: '/dashboard', label: 'Dashboard' },
+        { path: '/dashboard/manager', label: 'Positions' },
+        ...(user?.canPostJobs ? [
+          { path: '/dashboard/forms', label: 'Forms' },
+          { path: '/dashboard/questions', label: 'Questions' },
+          { path: '/dashboard/tests', label: 'Tests' },
+        ] : []),
+        { path: '/dashboard/analytics', label: 'Analytics' },
+        { path: '/dashboard/profile', label: 'Profile' },
+      ];
+    }
+    return [
+      { path: '/dashboard', label: 'Dashboard' },
+      { path: '/dashboard/applicant', label: 'My Applications' },
+      { path: '/jobs', label: 'Browse Jobs' },
+      { path: '/dashboard/profile', label: 'Profile' },
+    ];
+  };
 
   useEffect(() => {
     if (user?.profile) {
@@ -42,95 +81,117 @@ export default function Profile() {
     }
   }
 
+  const s = {
+    title: { fontSize: '2rem', fontWeight: 600, marginBottom: theme.spacing.sm },
+    subtitle: { color: theme.colors.textMuted, marginBottom: theme.spacing.xl },
+    actions: { display: 'flex', gap: theme.spacing.md, marginBottom: theme.spacing.xl },
+    btnSecondary: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontFamily: theme.fonts.body, textDecoration: 'none', display: 'inline-block' },
+    form: { display: 'flex', flexDirection: 'column', gap: theme.spacing.lg, maxWidth: '600px' },
+    formGroup: { display: 'flex', flexDirection: 'column', gap: theme.spacing.sm },
+    label: { color: theme.colors.textMuted, fontSize: '0.875rem', fontWeight: 500 },
+    message: { color: theme.colors.success, fontSize: '0.9rem', padding: theme.spacing.md, background: `${theme.colors.success}20` },
+    input: {
+      padding: theme.spacing.md,
+      border: `1px solid ${theme.colors.border}`,
+      background: theme.colors.bgCard,
+      color: theme.colors.text,
+      fontSize: '1rem',
+      fontFamily: theme.fonts.body,
+    },
+    textarea: {
+      padding: theme.spacing.md,
+      border: `1px solid ${theme.colors.border}`,
+      background: theme.colors.bgCard,
+      color: theme.colors.text,
+      fontSize: '1rem',
+      fontFamily: theme.fonts.body,
+      resize: 'vertical',
+    },
+    select: {
+      padding: theme.spacing.md,
+      border: `1px solid ${theme.colors.border}`,
+      background: theme.colors.bgCard,
+      color: theme.colors.text,
+      fontSize: '1rem',
+      fontFamily: theme.fonts.body,
+    },
+    button: {
+      padding: theme.spacing.md,
+      border: 'none',
+      background: theme.colors.primary,
+      color: '#fff',
+      fontSize: '1rem',
+      fontWeight: 600,
+      cursor: 'pointer',
+      fontFamily: theme.fonts.body,
+    },
+  };
+
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>My profile</h1>
-        <p style={styles.subtitle}>{user?.email} · {user?.role}</p>
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {message && <div style={styles.message}>{message}</div>}
-          <label style={styles.label}>Headline</label>
+    <DashboardLayout sidebar={<Sidebar items={getNavItems()} />}>
+      <h1 style={s.title}>My Profile</h1>
+      <p style={s.subtitle}>{user?.email} - {user?.role}</p>
+      <div style={s.actions}>
+        <Link to={`/users/${user?.username}`} target="_blank" style={s.btnSecondary}>View Public Profile</Link>
+      </div>
+      <form onSubmit={handleSubmit} style={s.form}>
+        {message && <div style={s.message}>{message}</div>}
+        <div style={s.formGroup}>
+          <label style={s.label}>Headline</label>
           <input
             type="text"
             value={headline}
             onChange={(e) => setHeadline(e.target.value)}
             placeholder="e.g. Senior Frontend Developer"
-            style={styles.input}
+            style={s.input}
           />
-          <label style={styles.label}>Bio</label>
+        </div>
+        <div style={s.formGroup}>
+          <label style={s.label}>Bio</label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             placeholder="Short bio"
             rows={3}
-            style={{ ...styles.input, resize: 'vertical' }}
+            style={s.textarea}
           />
-          <label style={styles.label}>Phone</label>
+        </div>
+        <div style={s.formGroup}>
+          <label style={s.label}>Phone</label>
           <input
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            style={styles.input}
+            style={s.input}
           />
-          <label style={styles.label}>Resume URL</label>
+        </div>
+        <div style={s.formGroup}>
+          <label style={s.label}>Resume URL</label>
           <input
             type="url"
             value={resumeUrl}
             onChange={(e) => setResumeUrl(e.target.value)}
             placeholder="https://..."
-            style={styles.input}
+            style={s.input}
           />
-          {user?.role === 'Applicant' && (
-            <>
-              <label style={styles.label}>Profile visibility</label>
-              <select
-                value={visibility}
-                onChange={(e) => setVisibility(e.target.value)}
-                style={styles.input}
-              >
-                <option value="private">Private</option>
-                <option value="public">Public (show in public profile)</option>
-              </select>
-            </>
-          )}
-          <button type="submit" disabled={saving} style={styles.button}>
-            {saving ? 'Saving…' : 'Save profile'}
-          </button>
-        </form>
-      </div>
-    </div>
+        </div>
+        {user?.role === 'Applicant' && (
+          <div style={s.formGroup}>
+            <label style={s.label}>Profile Visibility</label>
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value)}
+              style={s.select}
+            >
+              <option value="private">Private</option>
+              <option value="public">Public</option>
+            </select>
+          </div>
+        )}
+        <button type="submit" disabled={saving} style={s.button}>
+          {saving ? 'Saving...' : 'Save Profile'}
+        </button>
+      </form>
+    </DashboardLayout>
   );
 }
-
-const styles = {
-  page: {
-    minHeight: '100vh',
-    padding: '2rem',
-    background: '#0f172a',
-    color: '#f1f5f9',
-  },
-  card: { maxWidth: 560, margin: '0 auto' },
-  title: { margin: '0 0 0.25rem' },
-  subtitle: { color: '#94a3b8', margin: '0 0 1.5rem', fontSize: '0.9rem' },
-  form: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  label: { color: '#94a3b8', fontSize: '0.875rem' },
-  message: { color: '#86efac', fontSize: '0.9rem' },
-  input: {
-    padding: '0.75rem 1rem',
-    border: '1px solid #334155',
-    borderRadius: 8,
-    background: '#1e293b',
-    color: '#f1f5f9',
-    fontSize: '1rem',
-  },
-  button: {
-    padding: '0.75rem',
-    border: 'none',
-    borderRadius: 8,
-    background: '#3b82f6',
-    color: '#fff',
-    fontSize: '1rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-};

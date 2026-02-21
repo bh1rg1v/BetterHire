@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { Sidebar } from '../components/layout/Sidebar';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
 
 const STATUS_OPTIONS = [
@@ -10,7 +13,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function DashboardManager() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { theme } = useTheme();
   const [positions, setPositions] = useState([]);
   const [managers, setManagers] = useState([]);
   const [forms, setForms] = useState([]);
@@ -18,13 +22,33 @@ export default function DashboardManager() {
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ title: '', description: '', status: 'draft', assignedManagerId: '', formId: '', testId: '' });
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
 
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
+
+  const getNavItems = () => {
+    const items = [
+      { path: '/dashboard', label: 'Dashboard' },
+      ...(user?.role === 'Admin' ? [{ path: '/dashboard/admin', label: 'Organization' }] : []),
+      { path: '/dashboard/manager', label: 'Positions' },
+    ];
+    if (canEdit) {
+      items.push(
+        { path: '/dashboard/forms', label: 'Forms' },
+        { path: '/dashboard/questions', label: 'Questions' },
+        { path: '/dashboard/tests', label: 'Tests' }
+      );
+    }
+    items.push(
+      { path: '/dashboard/analytics', label: 'Analytics' },
+      { path: '/dashboard/profile', label: 'Profile' }
+    );
+    return items;
+  };
 
   const load = useCallback(async () => {
     if (!user || (user.role !== 'Admin' && user.role !== 'Manager')) return;
@@ -49,14 +73,12 @@ export default function DashboardManager() {
     }
   }, [user, statusFilter]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   function openCreate() {
     setEditingId(null);
     setForm({ title: '', description: '', status: 'draft', assignedManagerId: '', formId: '', testId: '' });
-    setShowForm(true);
+    setShowModal(true);
   }
 
   function openEdit(p) {
@@ -69,7 +91,7 @@ export default function DashboardManager() {
       formId: p.formId?._id || '',
       testId: p.testId?._id || '',
     });
-    setShowForm(true);
+    setShowModal(true);
   }
 
   async function handleSubmit(e) {
@@ -91,7 +113,7 @@ export default function DashboardManager() {
       } else {
         await api.api('/organizations/me/positions', { method: 'POST', body });
       }
-      setShowForm(false);
+      setShowModal(false);
       load();
     } catch (e) {
       setError(e.message || 'Save failed');
@@ -110,254 +132,204 @@ export default function DashboardManager() {
     }
   }
 
-  if (user?.role !== 'Admin' && user?.role !== 'Manager') {
-    return (
-      <div style={styles.page}>
-        <p style={styles.unauthorized}>Manager or Admin access required.</p>
-        <Link to="/dashboard">Back to dashboard</Link>
-      </div>
-    );
-  }
+  const getStatusColor = (status) => {
+    if (status === 'published') return theme.colors.success;
+    if (status === 'closed') return theme.colors.danger;
+    return theme.colors.textMuted;
+  };
+
+  if (user?.role !== 'Admin' && user?.role !== 'Manager') return null;
+
+  const s = {
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: theme.spacing.xl },
+    title: { fontSize: '2rem', fontWeight: 600, margin: 0 },
+    warning: { color: theme.colors.warning, fontSize: '0.9rem', marginTop: theme.spacing.sm },
+    error: { color: theme.colors.danger, marginBottom: theme.spacing.lg, padding: theme.spacing.md, background: `${theme.colors.danger}20` },
+    toolbar: { display: 'flex', gap: theme.spacing.md, marginBottom: theme.spacing.lg, alignItems: 'center' },
+    select: { padding: theme.spacing.md, background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
+    link: { color: theme.colors.primary, textDecoration: 'none', fontSize: '0.9rem' },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: theme.spacing.lg },
+    card: { background: theme.colors.bgCard, padding: theme.spacing.xl, border: `1px solid ${theme.colors.border}` },
+    cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: theme.spacing.md, marginBottom: theme.spacing.md },
+    cardTitle: { fontSize: '1.25rem', fontWeight: 600, margin: 0 },
+    badge: { padding: `${theme.spacing.xs} ${theme.spacing.md}`, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap' },
+    cardDesc: { color: theme.colors.textMuted, fontSize: '0.9rem', marginBottom: theme.spacing.md },
+    cardMeta: { display: 'flex', flexWrap: 'wrap', gap: theme.spacing.sm, marginBottom: theme.spacing.lg },
+    metaItem: { fontSize: '0.875rem', color: theme.colors.textMuted, background: theme.colors.bg, padding: `${theme.spacing.xs} ${theme.spacing.sm}` },
+    cardActions: { display: 'flex', gap: theme.spacing.sm, flexWrap: 'wrap' },
+    btnPrimary: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, border: 'none', color: '#fff', cursor: 'pointer', fontFamily: theme.fonts.body, fontWeight: 500, fontSize: '0.95rem' },
+    btnSecondary: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontFamily: theme.fonts.body },
+    btnSmall: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body, textDecoration: 'none', display: 'inline-block' },
+    empty: { textAlign: 'center', padding: theme.spacing.xxl },
+    emptyText: { fontSize: '1.25rem', color: theme.colors.textMuted, marginBottom: theme.spacing.lg },
+    modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
+    modal: { background: theme.colors.bgCard, padding: theme.spacing.xl, maxWidth: '600px', width: '90%', maxHeight: '90vh', overflow: 'auto', border: `1px solid ${theme.colors.border}` },
+    modalTitle: { fontSize: '1.5rem', fontWeight: 600, marginBottom: theme.spacing.lg },
+    form: { display: 'flex', flexDirection: 'column', gap: theme.spacing.lg },
+    formGroup: { display: 'flex', flexDirection: 'column', gap: theme.spacing.sm },
+    formRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.md },
+    label: { color: theme.colors.textMuted, fontSize: '0.875rem', fontWeight: 500 },
+    input: { padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
+    textarea: { padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body, resize: 'vertical' },
+    modalActions: { display: 'flex', gap: theme.spacing.md, justifyContent: 'flex-end', marginTop: theme.spacing.md },
+  };
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/dashboard" style={styles.logo}>BetterHire</Link>
-        <div style={styles.userRow}>
-          <span style={styles.userName}>{user?.name}</span>
-          <span style={styles.role}>{user?.role}</span>
-          {org && <span style={styles.org}> · {org.name}</span>}
-          <button type="button" onClick={logout} style={styles.logoutBtn}>Sign out</button>
+    <DashboardLayout sidebar={<Sidebar items={getNavItems()} />}>
+      <div style={s.header}>
+        <div>
+          <h1 style={s.title}>Job Positions</h1>
+          {!canEdit && <p style={s.warning}>Contact Admin to get "Can post jobs" permission</p>}
         </div>
-      </header>
-      <main style={styles.main}>
-        <h1 style={styles.h1}>Job positions</h1>
-        <p style={styles.navLinks}>
-          {canEdit && <Link to="/dashboard/forms" style={styles.link}>Forms</Link>}
-          {canEdit && <Link to="/dashboard/questions" style={styles.link}>Question bank</Link>}
-          {canEdit && <Link to="/dashboard/tests" style={styles.link}>Tests</Link>}
-          <Link to="/dashboard/analytics" style={styles.link}>Analytics</Link>
-          <Link to="/dashboard/analytics" style={styles.link}>Analytics &amp; export</Link>
-        </p>
-        {!canEdit && (
-          <p style={styles.muted}>You don’t have permission to create or edit positions. Contact your Admin to get &quot;Can post jobs&quot;.</p>
+        {canEdit && (
+          <button onClick={openCreate} style={s.btnPrimary}>
+            Create Position
+          </button>
         )}
-        {error && <div style={styles.error}>{error}</div>}
-        {loading ? (
-          <p>Loading…</p>
-        ) : (
-          <>
-            <div style={styles.toolbar}>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={styles.select}
-              >
-                <option value="">All statuses</option>
-                {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-              {canEdit && (
-                <button type="button" onClick={openCreate} style={styles.btnPrimary}>
-                  Create position
-                </button>
-              )}
-            </div>
-            {positions.length === 0 ? (
-              <p style={styles.muted}>No positions yet.</p>
-            ) : (
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Title</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Form</th>
-                    <th style={styles.th}>Test</th>
-                    <th style={styles.th}>Assigned manager</th>
-                    <th style={styles.th}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {positions.map((p) => (
-                    <tr key={p._id}>
-                      <td style={styles.td}>{p.title}</td>
-                      <td style={styles.td}>
-                        <span style={p.status === 'published' ? styles.badgeOk : p.status === 'closed' ? styles.badgeDanger : styles.badgeMuted}>
-                          {p.status}
-                        </span>
-                      </td>
-                      <td style={styles.td}>{p.formId?.name || '—'}</td>
-                      <td style={styles.td}>{p.testId?.title || '—'}</td>
-                      <td style={styles.td}>{p.assignedManagerId ? p.assignedManagerId.name : '—'}</td>
-                      <td style={styles.td}>
-                        {canEdit && (
-                          <>
-                            <button type="button" onClick={() => openEdit(p)} style={styles.btnSmall}>Edit</button>
-                            <Link to={`/dashboard/positions/${p._id}/submissions`} style={styles.btnSmall}>Submissions</Link>
-                            <Link to={`/dashboard/positions/${p._id}/attempts`} style={styles.btnSmall}>Attempts</Link>
-                            {p.status !== 'draft' && (
-                              <button type="button" onClick={() => setStatus(p._id, 'draft')} style={styles.btnSmall}>Draft</button>
-                            )}
-                            {p.status !== 'published' && (
-                              <button type="button" onClick={() => setStatus(p._id, 'published')} style={styles.btnSmall}>Publish</button>
-                            )}
-                            {p.status !== 'closed' && (
-                              <button type="button" onClick={() => setStatus(p._id, 'closed')} style={styles.btnSmall}>Close</button>
-                            )}
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {org && (
-              <p style={styles.publicLink}>
-                Public listing: <a href={`/jobs?org=${encodeURIComponent(org.slug)}`} target="_blank" rel="noopener noreferrer" style={styles.link}>
-                  /jobs?org={org.slug}
-                </a>
-              </p>
-            )}
-          </>
-        )}
-      </main>
+      </div>
 
-      {showForm && canEdit && (
-        <div style={styles.modalOverlay} onClick={() => setShowForm(false)}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>{editingId ? 'Edit position' : 'Create position'}</h2>
-            <form onSubmit={handleSubmit} style={styles.form}>
-              <label style={styles.label}>Title *</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                required
-                style={styles.input}
-              />
-              <label style={styles.label}>Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                rows={4}
-                style={{ ...styles.input, resize: 'vertical' }}
-              />
-              <label style={styles.label}>Status</label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                style={styles.input}
-              >
-                {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-              <label style={styles.label}>Application form</label>
-              <select
-                value={form.formId}
-                onChange={(e) => setForm((f) => ({ ...f, formId: e.target.value }))}
-                style={styles.input}
-              >
-                <option value="">— None —</option>
-                {forms.map((f) => (
-                  <option key={f._id} value={f._id}>{f.name}</option>
-                ))}
-              </select>
-              <label style={styles.label}>Test</label>
-              <select
-                value={form.testId}
-                onChange={(e) => setForm((f) => ({ ...f, testId: e.target.value }))}
-                style={styles.input}
-              >
-                <option value="">— None —</option>
-                {tests.map((t) => (
-                  <option key={t._id} value={t._id}>{t.title}</option>
-                ))}
-              </select>
-              <label style={styles.label}>Assigned manager</label>
-              <select
-                value={form.assignedManagerId}
-                onChange={(e) => setForm((f) => ({ ...f, assignedManagerId: e.target.value }))}
-                style={styles.input}
-              >
-                <option value="">— None —</option>
-                {managers.map((m) => (
-                  <option key={m._id} value={m._id}>{m.name} ({m.email})</option>
-                ))}
-              </select>
-              <div style={styles.modalActions}>
-                <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>Cancel</button>
-                <button type="submit" disabled={saving} style={styles.btnPrimary}>{saving ? 'Saving…' : 'Save'}</button>
+      {error && <div style={s.error}>{error}</div>}
+
+      <div style={s.toolbar}>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={s.select}>
+          <option value="">All Statuses</option>
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {org && (
+          <a href={`/jobs?org=${encodeURIComponent(org.slug)}`} target="_blank" rel="noopener noreferrer" style={s.link}>
+            Public Listing
+          </a>
+        )}
+      </div>
+
+      {loading ? <p>Loading...</p> : positions.length === 0 ? (
+        <div style={s.empty}>
+          <p style={s.emptyText}>No positions yet</p>
+          {canEdit && <button onClick={openCreate} style={s.btnPrimary}>Create First Position</button>}
+        </div>
+      ) : (
+        <div style={s.grid}>
+          {positions.map((p) => (
+            <div key={p._id} style={s.card}>
+              <div style={s.cardHeader}>
+                <h3 style={s.cardTitle}>{p.title}</h3>
+                <span style={{ ...s.badge, background: `${getStatusColor(p.status)}20`, color: getStatusColor(p.status) }}>
+                  {p.status}
+                </span>
+              </div>
+              {p.description && <p style={s.cardDesc}>{p.description.slice(0, 100)}...</p>}
+              <div style={s.cardMeta}>
+                {p.formId && <span style={s.metaItem}>Form: {p.formId.name}</span>}
+                {p.testId && <span style={s.metaItem}>Test: {p.testId.title}</span>}
+                {p.assignedManagerId && <span style={s.metaItem}>Manager: {p.assignedManagerId.name}</span>}
+              </div>
+              <div style={s.cardActions}>
+                {canEdit && (
+                  <>
+                    <button onClick={() => openEdit(p)} style={s.btnSmall}>Edit</button>
+                    <Link to={`/dashboard/positions/${p._id}/submissions`} style={s.btnSmall}>Submissions</Link>
+                    <Link to={`/dashboard/positions/${p._id}/attempts`} style={s.btnSmall}>Attempts</Link>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showModal && canEdit && (
+        <div style={s.modalOverlay} onClick={() => setShowModal(false)}>
+          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 style={s.modalTitle}>{editingId ? 'Edit Position' : 'Create Position'}</h2>
+            <form onSubmit={handleSubmit} style={s.form}>
+              <div style={s.formGroup}>
+                <label style={s.label}>Title *</label>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  required
+                  style={s.input}
+                />
+              </div>
+              <div style={s.formGroup}>
+                <label style={s.label}>Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  rows={4}
+                  style={s.textarea}
+                />
+              </div>
+              <div style={s.formRow}>
+                <div style={s.formGroup}>
+                  <label style={s.label}>Status</label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                    style={s.select}
+                  >
+                    {STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={s.formGroup}>
+                  <label style={s.label}>Assigned Manager</label>
+                  <select
+                    value={form.assignedManagerId}
+                    onChange={(e) => setForm((f) => ({ ...f, assignedManagerId: e.target.value }))}
+                    style={s.select}
+                  >
+                    <option value="">- None -</option>
+                    {managers.map((m) => (
+                      <option key={m._id} value={m._id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={s.formRow}>
+                <div style={s.formGroup}>
+                  <label style={s.label}>Application Form</label>
+                  <select
+                    value={form.formId}
+                    onChange={(e) => setForm((f) => ({ ...f, formId: e.target.value }))}
+                    style={s.select}
+                  >
+                    <option value="">- None -</option>
+                    {forms.map((f) => (
+                      <option key={f._id} value={f._id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={s.formGroup}>
+                  <label style={s.label}>Test</label>
+                  <select
+                    value={form.testId}
+                    onChange={(e) => setForm((f) => ({ ...f, testId: e.target.value }))}
+                    style={s.select}
+                  >
+                    <option value="">- None -</option>
+                    {tests.map((t) => (
+                      <option key={t._id} value={t._id}>{t.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={s.modalActions}>
+                <button type="button" onClick={() => setShowModal(false)} style={s.btnSecondary}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving} style={s.btnPrimary}>
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 }
-
-const styles = {
-  page: { minHeight: '100vh', background: '#0f172a', color: '#f1f5f9' },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '1rem 2rem',
-    borderBottom: '1px solid #334155',
-  },
-  logo: { fontWeight: 700, fontSize: '1.25rem', color: '#f1f5f9', textDecoration: 'none' },
-  userRow: { display: 'flex', alignItems: 'center', gap: '0.75rem' },
-  userName: { fontWeight: 500 },
-  role: { color: '#94a3b8', fontSize: '0.9rem' },
-  org: { color: '#64748b', fontSize: '0.9rem' },
-  logoutBtn: {
-    padding: '0.5rem 1rem',
-    background: 'transparent',
-    border: '1px solid #475569',
-    borderRadius: 6,
-    color: '#94a3b8',
-    cursor: 'pointer',
-  },
-  main: { padding: '2rem', maxWidth: 960 },
-  h1: { margin: '0 0 1rem' },
-  muted: { color: '#94a3b8', marginBottom: '1rem' },
-  error: { color: '#f87171', marginBottom: '1rem' },
-  toolbar: { display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' },
-  select: {
-    padding: '0.5rem 0.75rem',
-    border: '1px solid #334155',
-    borderRadius: 6,
-    background: '#1e293b',
-    color: '#f1f5f9',
-  },
-  btnPrimary: { padding: '0.5rem 1rem', background: '#3b82f6', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer' },
-  btnSecondary: { padding: '0.5rem 1rem', background: '#334155', border: 'none', borderRadius: 6, color: '#e2e8f0', cursor: 'pointer' },
-  btnSmall: { marginRight: '0.5rem', padding: '0.25rem 0.5rem', background: '#334155', border: 'none', borderRadius: 4, color: '#e2e8f0', cursor: 'pointer', fontSize: '0.875rem' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #334155' },
-  td: { padding: '0.5rem', borderBottom: '1px solid #334155' },
-  badgeOk: { color: '#86efac', fontSize: '0.85rem' },
-  badgeMuted: { color: '#94a3b8', fontSize: '0.85rem' },
-  badgeDanger: { color: '#f87171', fontSize: '0.85rem' },
-  navLinks: { marginBottom: '1rem', display: 'flex', gap: '1rem' },
-  publicLink: { marginTop: '1.5rem', color: '#94a3b8', fontSize: '0.9rem' },
-  link: { color: '#60a5fa' },
-  unauthorized: { color: '#94a3b8', marginBottom: '1rem' },
-  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  modal: { background: '#1e293b', padding: '1.5rem', borderRadius: 12, maxWidth: 480, width: '90%', maxHeight: '90vh', overflow: 'auto' },
-  modalTitle: { margin: '0 0 1rem' },
-  form: { display: 'flex', flexDirection: 'column', gap: '0.75rem' },
-  label: { color: '#94a3b8', fontSize: '0.875rem' },
-  input: {
-    padding: '0.5rem 0.75rem',
-    border: '1px solid #334155',
-    borderRadius: 6,
-    background: '#0f172a',
-    color: '#f1f5f9',
-    fontSize: '1rem',
-  },
-  modalActions: { display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' },
-};

@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { Sidebar } from '../components/layout/Sidebar';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
 
 export default function DashboardAdmin() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { theme } = useTheme();
   const [org, setOrg] = useState(null);
   const [managers, setManagers] = useState([]);
   const [invites, setInvites] = useState([]);
@@ -14,6 +17,17 @@ export default function DashboardAdmin() {
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [inviteLink, setInviteLink] = useState(null);
   const [patching, setPatching] = useState(null);
+
+  const navItems = [
+    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/dashboard/admin', label: 'Organization' },
+    { path: '/dashboard/manager', label: 'Positions' },
+    { path: '/dashboard/forms', label: 'Forms' },
+    { path: '/dashboard/questions', label: 'Questions' },
+    { path: '/dashboard/tests', label: 'Tests' },
+    { path: '/dashboard/analytics', label: 'Analytics' },
+    { path: '/dashboard/profile', label: 'Profile' },
+  ];
 
   const load = useCallback(async () => {
     if (user?.role !== 'Admin') return;
@@ -34,9 +48,7 @@ export default function DashboardAdmin() {
     }
   }, [user?.role]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   async function handleInvite(e) {
     e.preventDefault();
@@ -63,10 +75,7 @@ export default function DashboardAdmin() {
     setPatching(managerId);
     setError('');
     try {
-      await api.api(`/organizations/me/managers/${managerId}`, {
-        method: 'PATCH',
-        body,
-      });
+      await api.api(`/organizations/me/managers/${managerId}`, { method: 'PATCH', body });
       load();
     } catch (e) {
       setError(e.message || 'Update failed');
@@ -79,233 +88,178 @@ export default function DashboardAdmin() {
     navigator.clipboard?.writeText(link);
   }
 
-  if (user?.role !== 'Admin') {
-    return (
-      <div style={styles.page}>
-        <p style={styles.unauthorized}>Admin access required.</p>
-        <Link to="/dashboard">Back to dashboard</Link>
-      </div>
-    );
-  }
+  if (user?.role !== 'Admin') return null;
+
+  const s = {
+    title: { fontSize: '2rem', fontWeight: 600, marginBottom: theme.spacing.xl },
+    error: { color: theme.colors.danger, marginBottom: theme.spacing.lg, padding: theme.spacing.md, background: `${theme.colors.danger}20` },
+    card: { background: theme.colors.bgCard, padding: theme.spacing.xl, border: `1px solid ${theme.colors.border}`, marginBottom: theme.spacing.lg },
+    cardTitle: { fontSize: '1.25rem', fontWeight: 600, marginBottom: theme.spacing.lg },
+    infoGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: theme.spacing.lg },
+    label: { color: theme.colors.textMuted, fontSize: '0.875rem', display: 'block', marginBottom: theme.spacing.xs },
+    value: { color: theme.colors.text, fontWeight: 500 },
+    code: { background: theme.colors.bg, padding: `${theme.spacing.xs} ${theme.spacing.sm}`, fontFamily: theme.fonts.mono, fontSize: '0.9rem' },
+    form: { display: 'flex', gap: theme.spacing.md, flexWrap: 'wrap' },
+    input: { flex: 1, minWidth: '200px', padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
+    btn: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, border: 'none', color: '#fff', cursor: 'pointer', fontFamily: theme.fonts.body, fontWeight: 500 },
+    btnSecondary: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontFamily: theme.fonts.body },
+    btnSmall: { padding: `${theme.spacing.xs} ${theme.spacing.md}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body },
+    btnDanger: { padding: `${theme.spacing.xs} ${theme.spacing.md}`, background: theme.colors.danger, border: 'none', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontFamily: theme.fonts.body },
+    inviteBox: { marginTop: theme.spacing.lg },
+    inviteRow: { display: 'flex', gap: theme.spacing.md },
+    list: { display: 'flex', flexDirection: 'column', gap: theme.spacing.sm },
+    listItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: theme.spacing.md, background: theme.colors.bg },
+    table: { display: 'flex', flexDirection: 'column', gap: theme.spacing.sm },
+    tableRow: { display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1.5fr', gap: theme.spacing.md, padding: theme.spacing.md, background: theme.colors.bg, alignItems: 'center' },
+    tableCell: { display: 'flex', flexDirection: 'column', gap: theme.spacing.xs },
+    managerName: { fontWeight: 500 },
+    managerEmail: { fontSize: '0.875rem', color: theme.colors.textMuted },
+    badgeSuccess: { display: 'inline-block', padding: `${theme.spacing.xs} ${theme.spacing.sm}`, background: `${theme.colors.success}20`, color: theme.colors.success, fontSize: '0.875rem', fontWeight: 500 },
+    badgeWarn: { display: 'inline-block', padding: `${theme.spacing.xs} ${theme.spacing.sm}`, background: `${theme.colors.warning}20`, color: theme.colors.warning, fontSize: '0.875rem', fontWeight: 500 },
+    badgeDanger: { display: 'inline-block', padding: `${theme.spacing.xs} ${theme.spacing.sm}`, background: `${theme.colors.danger}20`, color: theme.colors.danger, fontSize: '0.875rem', fontWeight: 500 },
+    checkbox: { display: 'flex', alignItems: 'center', gap: theme.spacing.sm, cursor: 'pointer', fontSize: '0.9rem' },
+    muted: { color: theme.colors.textMuted },
+  };
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/dashboard" style={styles.logo}>BetterHire</Link>
-        <div style={styles.userRow}>
-          <span style={styles.userName}>{user?.name}</span>
-          <span style={styles.role}>Admin</span>
-          {org && <span style={styles.org}> · {org.name}</span>}
-          <button type="button" onClick={logout} style={styles.logoutBtn}>Sign out</button>
-        </div>
-      </header>
-      <main style={styles.main}>
-        <h1 style={styles.h1}>Organization Admin</h1>
-        {error && <div style={styles.error}>{error}</div>}
-        {loading ? (
-          <p>Loading…</p>
-        ) : (
-          <>
-            {org && (
-              <section style={styles.section}>
-                <h2 style={styles.h2}>Organization</h2>
-                <p><strong>Name:</strong> {org.name}</p>
-                <p><strong>Handle (slug):</strong> <code style={styles.code}>{org.slug}</code></p>
-              </section>
-            )}
+    <DashboardLayout sidebar={<Sidebar items={navItems} />}>
+      <h1 style={s.title}>Organization Management</h1>
+      {error && <div style={s.error}>{error}</div>}
+      
+      {loading ? <p>Loading...</p> : (
+        <>
+          {org && (
+            <div style={s.card}>
+              <h2 style={s.cardTitle}>Organization Details</h2>
+              <div style={s.infoGrid}>
+                <div>
+                  <span style={s.label}>Name:</span>
+                  <span style={s.value}>{org.name}</span>
+                </div>
+                <div>
+                  <span style={s.label}>Subdomain:</span>
+                  <code style={s.code}>{org.slug}.yourdomain.com</code>
+                </div>
+              </div>
+            </div>
+          )}
 
-            <section style={styles.section}>
-              <h2 style={styles.h2}>Invite manager</h2>
-              <form onSubmit={handleInvite} style={styles.form}>
-                <input
-                  type="email"
-                  placeholder="Manager email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  style={styles.input}
-                />
-                <button type="submit" disabled={inviteSubmitting} style={styles.btn}>
-                  {inviteSubmitting ? 'Sending…' : 'Send invite'}
-                </button>
-              </form>
-              {inviteLink && (
-                <div style={styles.inviteLinkBox}>
-                  <p style={styles.inviteLabel}>Invite link (share with invitee):</p>
-                  <div style={styles.inviteRow}>
-                    <input readOnly value={inviteLink} style={styles.input} />
-                    <button type="button" onClick={() => copyInviteLink(inviteLink)} style={styles.btnSecondary}>
-                      Copy
+          <div style={s.card}>
+            <h2 style={s.cardTitle}>Invite Manager</h2>
+            <form onSubmit={handleInvite} style={s.form}>
+              <input
+                type="email"
+                placeholder="Manager email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                style={s.input}
+              />
+              <button type="submit" disabled={inviteSubmitting} style={s.btn}>
+                {inviteSubmitting ? 'Sending...' : 'Send Invite'}
+              </button>
+            </form>
+            {inviteLink && (
+              <div style={s.inviteBox}>
+                <p style={s.label}>Invite link:</p>
+                <div style={s.inviteRow}>
+                  <input readOnly value={inviteLink} style={s.input} />
+                  <button onClick={() => copyInviteLink(inviteLink)} style={s.btnSecondary}>
+                    Copy
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {invites.length > 0 && (
+            <div style={s.card}>
+              <h2 style={s.cardTitle}>Pending Invites</h2>
+              <div style={s.list}>
+                {invites.map((inv) => (
+                  <div key={inv._id} style={s.listItem}>
+                    <span>{inv.email}</span>
+                    <button
+                      onClick={() => copyInviteLink(`${window.location.origin}/invite/accept?token=${inv.token}`)}
+                      style={s.btnSmall}
+                    >
+                      Copy Link
                     </button>
                   </div>
-                </div>
-              )}
-            </section>
+                ))}
+              </div>
+            </div>
+          )}
 
-            <section style={styles.section}>
-              <h2 style={styles.h2}>Pending invites</h2>
-              {invites.length === 0 ? (
-                <p style={styles.muted}>No pending invites.</p>
-              ) : (
-                <ul style={styles.list}>
-                  {invites.map((inv) => (
-                    <li key={inv._id} style={styles.listItem}>
-                      {inv.email}
-                      <span style={styles.muted}> — expires {new Date(inv.expiresAt).toLocaleDateString()}</span>
-                      <br />
-                      <button
-                        type="button"
-                        onClick={() => copyInviteLink(`${window.location.origin}/invite/accept?token=${inv.token}`)}
-                        style={styles.btnSmall}
-                      >
-                        Copy link
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section style={styles.section}>
-              <h2 style={styles.h2}>Managers</h2>
-              <p style={styles.muted}>Only Org Admin can approve managers and grant &quot;Can post jobs&quot;.</p>
-              {managers.length === 0 ? (
-                <p style={styles.muted}>No managers yet.</p>
-              ) : (
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Name</th>
-                      <th style={styles.th}>Email</th>
-                      <th style={styles.th}>Status</th>
-                      <th style={styles.th}>Can post jobs</th>
-                      <th style={styles.th}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {managers.map((m) => (
-                      <tr key={m._id}>
-                        <td style={styles.td}>{m.name}</td>
-                        <td style={styles.td}>{m.email}</td>
-                        <td style={styles.td}>
-                          {!m.isActive ? (
-                            <span style={styles.badgeDanger}>Deactivated</span>
-                          ) : m.pendingApproval ? (
-                            <span style={styles.badgeWarn}>Pending approval</span>
-                          ) : (
-                            <span style={styles.badgeOk}>Active</span>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          {m.isActive && !m.pendingApproval && (
-                            <label style={styles.checkLabel}>
-                              <input
-                                type="checkbox"
-                                checked={!!m.canPostJobs}
-                                onChange={(e) => patchManager(m._id, { canPostJobs: e.target.checked })}
-                                disabled={patching === m._id}
-                              />
-                              {' '}Yes
-                            </label>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          {m.pendingApproval && (
-                            <button
-                              type="button"
-                              onClick={() => patchManager(m._id, { approved: true })}
-                              disabled={patching === m._id}
-                              style={styles.btnSmall}
-                            >
-                              Approve
-                            </button>
-                          )}
-                          {m.isActive && !m.pendingApproval && (
-                            <button
-                              type="button"
-                              onClick={() => patchManager(m._id, { isActive: false })}
-                              disabled={patching === m._id}
-                              style={styles.btnDanger}
-                            >
-                              Deactivate
-                            </button>
-                          )}
-                          {!m.isActive && (
-                            <button
-                              type="button"
-                              onClick={() => patchManager(m._id, { isActive: true })}
-                              disabled={patching === m._id}
-                              style={styles.btnSmall}
-                            >
-                              Activate
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </section>
-          </>
-        )}
-      </main>
-    </div>
+          <div style={s.card}>
+            <h2 style={s.cardTitle}>Managers</h2>
+            {managers.length === 0 ? (
+              <p style={s.muted}>No managers yet.</p>
+            ) : (
+              <div style={s.table}>
+                {managers.map((m) => (
+                  <div key={m._id} style={s.tableRow}>
+                    <div style={s.tableCell}>
+                      <div style={s.managerName}>{m.name}</div>
+                      <div style={s.managerEmail}>{m.email}</div>
+                    </div>
+                    <div style={s.tableCell}>
+                      {!m.isActive ? (
+                        <span style={s.badgeDanger}>Deactivated</span>
+                      ) : m.pendingApproval ? (
+                        <span style={s.badgeWarn}>Pending</span>
+                      ) : (
+                        <span style={s.badgeSuccess}>Active</span>
+                      )}
+                    </div>
+                    <div style={s.tableCell}>
+                      {m.isActive && !m.pendingApproval && (
+                        <label style={s.checkbox}>
+                          <input
+                            type="checkbox"
+                            checked={!!m.canPostJobs}
+                            onChange={(e) => patchManager(m._id, { canPostJobs: e.target.checked })}
+                            disabled={patching === m._id}
+                          />
+                          Can post jobs
+                        </label>
+                      )}
+                    </div>
+                    <div style={s.tableCell}>
+                      {m.pendingApproval && (
+                        <button
+                          onClick={() => patchManager(m._id, { approved: true })}
+                          disabled={patching === m._id}
+                          style={s.btnSmall}
+                        >
+                          Approve
+                        </button>
+                      )}
+                      {m.isActive && !m.pendingApproval && (
+                        <button
+                          onClick={() => patchManager(m._id, { isActive: false })}
+                          disabled={patching === m._id}
+                          style={s.btnDanger}
+                        >
+                          Deactivate
+                        </button>
+                      )}
+                      {!m.isActive && (
+                        <button
+                          onClick={() => patchManager(m._id, { isActive: true })}
+                          disabled={patching === m._id}
+                          style={s.btnSmall}
+                        >
+                          Activate
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </DashboardLayout>
   );
 }
-
-const styles = {
-  page: { minHeight: '100vh', background: '#0f172a', color: '#f1f5f9' },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '1rem 2rem',
-    borderBottom: '1px solid #334155',
-  },
-  logo: { fontWeight: 700, fontSize: '1.25rem', color: '#f1f5f9', textDecoration: 'none' },
-  userRow: { display: 'flex', alignItems: 'center', gap: '0.75rem' },
-  userName: { fontWeight: 500 },
-  role: { color: '#94a3b8', fontSize: '0.9rem' },
-  org: { color: '#64748b', fontSize: '0.9rem' },
-  logoutBtn: {
-    padding: '0.5rem 1rem',
-    background: 'transparent',
-    border: '1px solid #475569',
-    borderRadius: 6,
-    color: '#94a3b8',
-    cursor: 'pointer',
-  },
-  main: { padding: '2rem', maxWidth: 900 },
-  h1: { margin: '0 0 1rem' },
-  h2: { margin: '0 0 0.75rem', fontSize: '1.1rem' },
-  error: { color: '#f87171', marginBottom: '1rem' },
-  section: { marginBottom: '2rem' },
-  form: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' },
-  input: {
-    padding: '0.5rem 0.75rem',
-    border: '1px solid #334155',
-    borderRadius: 6,
-    background: '#1e293b',
-    color: '#f1f5f9',
-    minWidth: 200,
-  },
-  btn: { padding: '0.5rem 1rem', background: '#3b82f6', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer' },
-  btnSecondary: { padding: '0.5rem 1rem', background: '#334155', border: 'none', borderRadius: 6, color: '#e2e8f0', cursor: 'pointer' },
-  btnSmall: { padding: '0.25rem 0.5rem', background: '#334155', border: 'none', borderRadius: 4, color: '#e2e8f0', cursor: 'pointer', fontSize: '0.875rem' },
-  btnDanger: { padding: '0.25rem 0.5rem', background: '#dc2626', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', fontSize: '0.875rem' },
-  code: { background: '#1e293b', padding: '0.2rem 0.4rem', borderRadius: 4 },
-  inviteLinkBox: { marginTop: '0.75rem' },
-  inviteLabel: { margin: '0 0 0.25rem', fontSize: '0.9rem', color: '#94a3b8' },
-  inviteRow: { display: 'flex', gap: '0.5rem', alignItems: 'center' },
-  list: { listStyle: 'none', padding: 0, margin: 0 },
-  listItem: { marginBottom: '0.5rem' },
-  muted: { color: '#94a3b8', fontSize: '0.9rem' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #334155' },
-  td: { padding: '0.5rem', borderBottom: '1px solid #334155' },
-  checkLabel: { cursor: 'pointer' },
-  badgeOk: { color: '#86efac', fontSize: '0.85rem' },
-  badgeWarn: { color: '#fcd34d', fontSize: '0.85rem' },
-  badgeDanger: { color: '#f87171', fontSize: '0.85rem' },
-  unauthorized: { color: '#94a3b8', marginBottom: '1rem' },
-};
