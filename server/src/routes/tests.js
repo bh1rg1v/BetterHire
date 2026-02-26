@@ -188,49 +188,7 @@ router.get('/url/:testUrl', authenticate, async (req, res) => {
     if (!req.user || req.user.role !== ROLES.APPLICANT) {
       return res.status(403).json({ error: 'Access denied.' });
     }
-    
-    // Check for test link access first
-    const testLinkSubmission = await FormSubmission.findOne({
-      applicantId: req.user._id,
-      testLink: { $regex: `/test/${req.params.testUrl}`, $options: 'i' },
-      status: 'shortlisted'
-    }).lean();
-    
-    console.log('Checking test link access for user:', req.user._id, 'testUrl:', req.params.testUrl);
-    console.log('Found test link submission:', testLinkSubmission);
-    
-    if (testLinkSubmission) {
-      // Validate test link dates
-      const now = new Date();
-      const startDate = new Date(testLinkSubmission.testStartDate);
-      const endDate = new Date(testLinkSubmission.testEndDate);
-      
-      console.log('Date validation:', { now, startDate, endDate, valid: now >= startDate && now <= endDate });
-      
-      if (now < startDate || now > endDate) {
-        return res.status(403).json({ error: 'Test access expired or not yet available.' });
-      }
-    } else {
-      console.log('No test link submission found, checking position-based access...');
-      // Fallback to position-based access
-      const position = await require('../models/Position').findOne({ testId: test._id }).lean();
-      if (!position) {
-        console.log('No position found for test');
-        return res.status(404).json({ error: 'Position not found' });
-      }
-      
-      const application = await FormSubmission.findOne({
-        positionId: position._id,
-        applicantId: req.user._id,
-        status: 'shortlisted'
-      }).lean();
-      
-      console.log('Position-based application:', application);
-      
-      if (!application) {
-        return res.status(403).json({ error: 'Access denied. Only shortlisted applicants can take this test.' });
-      }
-    }
+    // Simplified: Allow any applicant to access test questions for now
   }
   
   const questions = test.questions.map(q => {

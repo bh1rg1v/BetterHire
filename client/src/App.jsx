@@ -27,6 +27,7 @@ import Tests from './pages/Tests';
 import TestCreate from './pages/TestCreate';
 import TestEdit from './pages/TestEdit';
 import TestOverview from './pages/TestOverview';
+import TakeTest from './pages/TakeTest';
 import Analytics from './pages/Analytics';
 import PositionCreate from './pages/PositionCreate';
 import PositionEdit from './pages/PositionEdit';

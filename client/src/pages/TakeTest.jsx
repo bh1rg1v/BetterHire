@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import * as api from '../api/client';
@@ -9,23 +9,25 @@ export default function TakeTest() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const location = useLocation();
   const [test, setTest] = useState(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [answers, setAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const isTakingTest = location.pathname.includes('/take');
-
   useEffect(() => {
     async function loadTest() {
       try {
-        const res = await api.api(`/tests/url/${testUrl}${questionId ? `?questionId=${questionId}` : ''}`, { auth: false });
+        const res = await api.api(`/tests/url/${testUrl}?questionId=1`);
         setTest(res.test);
-        if (res.test.durationMinutes && isTakingTest) {
+        if (res.test.durationMinutes) {
           setTimeLeft(res.test.durationMinutes * 60);
+        }
+        if (questionId && res.test.questions) {
+          const idx = res.test.questions.findIndex(q => (q._id || q.questionId?._id) === questionId);
+          if (idx >= 0) setCurrentQuestionIndex(idx);
         }
       } catch (e) {
         setError(e.message || 'Test not found');
@@ -34,10 +36,10 @@ export default function TakeTest() {
       }
     }
     loadTest();
-  }, [testUrl, questionId, isTakingTest]);
+  }, [testUrl, questionId]);
 
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0 || !isTakingTest) return;
+    if (timeLeft === null || timeLeft <= 0) return;
     
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -50,10 +52,26 @@ export default function TakeTest() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, isTakingTest]);
+  }, [timeLeft]);
 
   const handleAnswerChange = (questionId, value) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const handleNext = () => {
+    if (currentQuestionIndex < test.questions.length - 1) {
+      const nextQuestion = test.questions[currentQuestionIndex + 1];
+      const nextQuestionId = nextQuestion._id || nextQuestion.questionId?._id;
+      navigate(`/test/${testUrl}/${nextQuestionId}`);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      const prevQuestion = test.questions[currentQuestionIndex - 1];
+      const prevQuestionId = prevQuestion._id || prevQuestion.questionId?._id;
+      navigate(`/test/${testUrl}/${prevQuestionId}`);
+    }
   };
 
   const handleSubmit = async () => {
@@ -181,6 +199,11 @@ export default function TakeTest() {
       background: theme.colors.bgCard,
       border: `1px solid ${theme.colors.border}`,
     },
+    progress: {
+      fontSize: '0.9rem',
+      color: theme.colors.textMuted,
+      marginBottom: theme.spacing.md,
+    },
   };
 
   if (loading) {
@@ -206,39 +229,30 @@ export default function TakeTest() {
     );
   }
 
-  if (!isTakingTest) {
+  if (!test?.questions || test.questions.length === 0) {
     return (
       <div style={styles.page}>
         <div style={styles.container}>
-          <h1 style={styles.title}>{test?.title || 'Test'}</h1>
-          
           <div style={styles.question}>
-            <h3>Test Information</h3>
-            <p><strong>Duration:</strong> {test?.durationMinutes ? `${test.durationMinutes} minutes` : 'No time limit'}</p>
-            <p><strong>Questions:</strong> {test?.questionsCount || test?.questions?.length || 0}</p>
-            {test?.attemptsCount !== undefined && (
-              <p><strong>Your attempts:</strong> {test.attemptsCount} / {test.maxAttempts || 1}</p>
-            )}
+            <p>No questions available for this test.</p>
           </div>
-
-          <div style={styles.actions}>
-            <button onClick={() => navigate(-1)} style={styles.buttonSecondary}>
-              Back
-            </button>
-            <button onClick={() => navigate(`/test/${testUrl}/take`)} style={styles.button}>
-              Start Test
-            </button>
-          </div>
+          <button onClick={() => navigate(`/test/${testUrl}`)} style={styles.button}>
+            Back to Overview
+          </button>
         </div>
       </div>
     );
   }
 
+  const currentQuestion = test.questions[currentQuestionIndex];
+  const question = currentQuestion.questionId || currentQuestion;
+  const questionIdKey = question._id;
+
   return (
     <div style={styles.page}>
       <div style={styles.container}>
         <div style={styles.header}>
-          <h1 style={styles.title}>{test?.title || 'Test'}</h1>
+          <h1 style={styles.title}>{test.title}</h1>
           {timeLeft !== null && (
             <div style={styles.timer}>
               Time Left: {formatTime(timeLeft)}
@@ -248,64 +262,61 @@ export default function TakeTest() {
 
         {error && <div style={styles.error}>{error}</div>}
 
-        {test?.questions && test.questions.length > 0 ? (
-          <div>
-            {test.questions.map((q, index) => {
-              const question = q.questionId || q;
-              const questionId = question._id;
-              
-              return (
-                <div key={questionId} style={styles.question}>
-                  <h4 style={styles.questionTitle}>Question {index + 1}</h4>
-                  <p style={styles.questionText}>{question.questionText}</p>
-                  
-                  {question.type === 'mcq' && question.options && (
-                    <div>
-                      {question.options.map((option, optIndex) => (
-                        <label key={optIndex} style={styles.option}>
-                          <input
-                            type="radio"
-                            name={`q${questionId}`}
-                            value={optIndex}
-                            checked={answers[questionId] == optIndex}
-                            onChange={(e) => handleAnswerChange(questionId, parseInt(e.target.value))}
-                            style={styles.radio}
-                          />
-                          {option.text}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {question.type === 'descriptive' && (
-                    <textarea
-                      placeholder="Your answer..."
-                      value={answers[questionId] || ''}
-                      onChange={(e) => handleAnswerChange(questionId, e.target.value)}
-                      style={styles.textarea}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={styles.question}>
-            <p>No questions available for this test.</p>
-          </div>
-        )}
+        <div style={styles.progress}>
+          Question {currentQuestionIndex + 1} of {test.questions.length}
+        </div>
+
+        <div style={styles.question}>
+          <h4 style={styles.questionTitle}>Question {currentQuestionIndex + 1}</h4>
+          <p style={styles.questionText}>{question.questionText}</p>
+          
+          {question.type === 'mcq' && question.options && (
+            <div>
+              {question.options.map((option, optIndex) => (
+                <label key={optIndex} style={styles.option}>
+                  <input
+                    type="radio"
+                    name={`q${questionIdKey}`}
+                    value={optIndex}
+                    checked={answers[questionIdKey] == optIndex}
+                    onChange={(e) => handleAnswerChange(questionIdKey, parseInt(e.target.value))}
+                    style={styles.radio}
+                  />
+                  {option.text}
+                </label>
+              ))}
+            </div>
+          )}
+          
+          {question.type === 'descriptive' && (
+            <textarea
+              placeholder="Your answer..."
+              value={answers[questionIdKey] || ''}
+              onChange={(e) => handleAnswerChange(questionIdKey, e.target.value)}
+              style={styles.textarea}
+            />
+          )}
+        </div>
 
         <div style={styles.actions}>
-          <button onClick={() => navigate(`/test/${testUrl}`)} style={styles.buttonSecondary}>
-            Back to Overview
-          </button>
-          <button 
-            onClick={handleSubmit} 
-            disabled={submitting}
-            style={styles.button}
-          >
-            {submitting ? 'Submitting...' : 'Submit Test'}
-          </button>
+          <div>
+            {currentQuestionIndex > 0 && (
+              <button onClick={handlePrevious} style={styles.buttonSecondary}>
+                Previous
+              </button>
+            )}
+          </div>
+          <div>
+            {currentQuestionIndex < test.questions.length - 1 ? (
+              <button onClick={handleNext} style={styles.button}>
+                Next
+              </button>
+            ) : (
+              <button onClick={handleSubmit} disabled={submitting} style={styles.button}>
+                {submitting ? 'Submitting...' : 'Submit Test'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
