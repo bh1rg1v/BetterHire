@@ -21,10 +21,9 @@ export default function DashboardAdmin() {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/dashboard/admin', label: 'Organization' },
-    { path: '/dashboard/manager', label: 'Positions' },
     { path: '/dashboard/forms', label: 'Forms' },
-    { path: '/dashboard/questions', label: 'Questions' },
     { path: '/dashboard/tests', label: 'Tests' },
+    { path: '/dashboard/questions', label: 'Questions' },
     { path: '/dashboard/analytics', label: 'Analytics' },
     { path: '/dashboard/profile', label: 'Profile' },
   ];

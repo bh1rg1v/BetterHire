@@ -19,28 +19,29 @@ export default function Profile() {
   const [message, setMessage] = useState('');
 
   const getNavItems = () => {
-    if (user?.role === 'Admin') {
+    const orgSlug = user?.organizationId?.slug;
+    if (user?.role === 'Admin' && orgSlug) {
+      const role = 'admin';
       return [
-        { path: '/dashboard', label: 'Dashboard' },
-        { path: '/dashboard/admin', label: 'Organization' },
-        { path: '/dashboard/manager', label: 'Positions' },
-        { path: '/dashboard/forms', label: 'Forms' },
-        { path: '/dashboard/questions', label: 'Questions' },
-        { path: '/dashboard/tests', label: 'Tests' },
-        { path: '/dashboard/analytics', label: 'Analytics' },
+        { path: `/${orgSlug}/${role}/dashboard`, label: 'Dashboard' },
+        { path: `/${orgSlug}/admin/dashboard`, label: 'Organization' },
+        { path: `/${orgSlug}/${role}/forms`, label: 'Forms' },
+        { path: `/${orgSlug}/${role}/tests`, label: 'Tests' },
+        { path: `/${orgSlug}/${role}/questions`, label: 'Questions' },
+        { path: `/${orgSlug}/${role}/analytics`, label: 'Analytics' },
         { path: '/dashboard/profile', label: 'Profile' },
       ];
     }
-    if (user?.role === 'Manager') {
+    if (user?.role === 'Manager' && orgSlug) {
+      const role = 'manager';
       return [
-        { path: '/dashboard', label: 'Dashboard' },
-        { path: '/dashboard/manager', label: 'Positions' },
+        { path: `/${orgSlug}/${role}/dashboard`, label: 'Dashboard' },
         ...(user?.canPostJobs ? [
-          { path: '/dashboard/forms', label: 'Forms' },
-          { path: '/dashboard/questions', label: 'Questions' },
-          { path: '/dashboard/tests', label: 'Tests' },
+          { path: `/${orgSlug}/${role}/forms`, label: 'Forms' },
+          { path: `/${orgSlug}/${role}/tests`, label: 'Tests' },
+          { path: `/${orgSlug}/${role}/questions`, label: 'Questions' },
         ] : []),
-        { path: '/dashboard/analytics', label: 'Analytics' },
+        { path: `/${orgSlug}/${role}/analytics`, label: 'Analytics' },
         { path: '/dashboard/profile', label: 'Profile' },
       ];
     }

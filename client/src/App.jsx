@@ -28,6 +28,7 @@ import TestCreate from './pages/TestCreate';
 import TestEdit from './pages/TestEdit';
 import TestOverview from './pages/TestOverview';
 import TakeTest from './pages/TakeTest';
+import TestSubmissions from './pages/TestSubmissions';
 import Analytics from './pages/Analytics';
 import PositionCreate from './pages/PositionCreate';
 import PositionEdit from './pages/PositionEdit';
@@ -85,6 +86,8 @@ function AppRoutes() {
       <Route path="/:orgHandle/manager/tests/create" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><TestCreate /></OrgProvider></ProtectedRoute>} />
       <Route path="/:orgHandle/admin/tests/:id/edit" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><TestEdit /></OrgProvider></ProtectedRoute>} />
       <Route path="/:orgHandle/manager/tests/:id/edit" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><TestEdit /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/tests/:testId/submissions" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><TestSubmissions /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/tests/:testId/submissions" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><TestSubmissions /></OrgProvider></ProtectedRoute>} />
       <Route path="/:orgHandle/admin/positions/create" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><PositionCreate /></OrgProvider></ProtectedRoute>} />
       <Route path="/:orgHandle/manager/positions/create" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><PositionCreate /></OrgProvider></ProtectedRoute>} />
       <Route path="/:orgHandle/admin/positions/:positionUrl/edit" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><PositionEdit /></OrgProvider></ProtectedRoute>} />

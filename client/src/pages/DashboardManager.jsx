@@ -41,8 +41,8 @@ export default function DashboardManager() {
     if (canEdit) {
       items.push(
         { path: `/${orgSlug}/${userRole}/forms`, label: 'Forms' },
-        { path: `/${orgSlug}/${userRole}/questions`, label: 'Questions' },
-        { path: `/${orgSlug}/${userRole}/tests`, label: 'Tests' }
+        { path: `/${orgSlug}/${userRole}/tests`, label: 'Tests' },
+        { path: `/${orgSlug}/${userRole}/questions`, label: 'Questions' }
       );
     }
     items.push(

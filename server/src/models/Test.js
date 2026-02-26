@@ -9,12 +9,15 @@ const testSchema = new mongoose.Schema(
     },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '', trim: true },
+    instructions: { type: String, default: '', trim: true },
     /** Unique URL slug for the test */
     testUrl: { type: String, required: true, unique: true, trim: true, lowercase: true },
     /** Duration in minutes. 0 = no time limit. */
     durationMinutes: { type: Number, default: 0, min: 0 },
     /** Maximum attempts allowed. Default is 1. */
     maxAttempts: { type: Number, default: 1, min: 1 },
+    /** List of emails allowed to access this test */
+    allowedEmails: [{ type: String, trim: true, lowercase: true }],
     /** Questions in order: [{ questionId, order, points }]. points overrides question.maxScore for this test. */
     questions: [
       {

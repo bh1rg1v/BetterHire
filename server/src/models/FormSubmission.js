@@ -15,7 +15,8 @@ const formSubmissionSchema = new mongoose.Schema(
     /** Test link for shortlisted candidates */
     testLink: { type: String, trim: true, default: '' },
     testStartDate: { type: Date, default: null },
-    testEndDate: { type: Date, default: null }
+    testEndDate: { type: Date, default: null },
+    maxAttempts: { type: Number, default: 1, min: 1 }
   },
   { timestamps: true }
 );

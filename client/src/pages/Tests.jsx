@@ -15,6 +15,8 @@ export default function Tests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null);
+  const [editingEmailsId, setEditingEmailsId] = useState(null);
+  const [emailsText, setEmailsText] = useState('');
 
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
   const orgSlug = organization?.slug;
@@ -40,10 +42,29 @@ export default function Tests() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
+  function openEmailsModal(test) {
+    setEditingEmailsId(test._id);
+    setEmailsText((test.allowedEmails || []).join('\n'));
+  }
+
+  async function saveEmails() {
+    try {
+      const emails = emailsText.split('\n').map(e => e.trim()).filter(e => e);
+      await api.api(`/organizations/me/tests/${editingEmailsId}`, {
+        method: 'PATCH',
+        body: { allowedEmails: emails }
+      });
+      setEditingEmailsId(null);
+      load();
+    } catch (e) {
+      setError(e.message || 'Failed to save emails');
+    }
+  }
+
   const navItems = !orgSlug ? [] : user?.role === 'Admin'
-    ? [{ label: 'Dashboard', path: `/${orgSlug}/admin/dashboard` }, { label: 'Forms', path: `/${orgSlug}/admin/forms` }, { label: 'Questions', path: `/${orgSlug}/admin/questions` }, { label: 'Tests', path: `/${orgSlug}/admin/tests` }, { label: 'Analytics', path: `/${orgSlug}/admin/analytics` }, { label: 'Profile', path: '/dashboard/profile' }]
+    ? [{ label: 'Dashboard', path: `/${orgSlug}/admin/dashboard` }, { label: 'Forms', path: `/${orgSlug}/admin/forms` }, { label: 'Tests', path: `/${orgSlug}/admin/tests` }, { label: 'Questions', path: `/${orgSlug}/admin/questions` }, { label: 'Analytics', path: `/${orgSlug}/admin/analytics` }, { label: 'Profile', path: '/dashboard/profile' }]
     : user?.canPostJobs
-    ? [{ label: 'Dashboard', path: `/${orgSlug}/manager/dashboard` }, { label: 'Forms', path: `/${orgSlug}/manager/forms` }, { label: 'Questions', path: `/${orgSlug}/manager/questions` }, { label: 'Tests', path: `/${orgSlug}/manager/tests` }, { label: 'Analytics', path: `/${orgSlug}/manager/analytics` }, { label: 'Profile', path: '/dashboard/profile' }]
+    ? [{ label: 'Dashboard', path: `/${orgSlug}/manager/dashboard` }, { label: 'Forms', path: `/${orgSlug}/manager/forms` }, { label: 'Tests', path: `/${orgSlug}/manager/tests` }, { label: 'Questions', path: `/${orgSlug}/manager/questions` }, { label: 'Analytics', path: `/${orgSlug}/manager/analytics` }, { label: 'Profile', path: '/dashboard/profile' }]
     : [{ label: 'Dashboard', path: `/${orgSlug}/manager/dashboard` }, { label: 'Profile', path: '/dashboard/profile' }];
 
   if (!canEdit) return <DashboardLayout sidebar={<Sidebar items={navItems} />}><div style={{ padding: '2rem' }}><p>Permission required.</p></div></DashboardLayout>;
@@ -54,11 +75,13 @@ export default function Tests() {
     error: { color: theme.colors.danger, marginBottom: theme.spacing.lg, padding: theme.spacing.md, background: `${theme.colors.danger}20`, border: `1px solid ${theme.colors.danger}` },
     btn: { padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, border: 'none', color: '#fff', cursor: 'pointer', fontFamily: theme.fonts.body, fontWeight: 500, marginBottom: theme.spacing.xl, textDecoration: 'none', display: 'inline-block' },
     list: { listStyle: 'none', padding: 0 },
-    listItem: { marginBottom: theme.spacing.md, padding: theme.spacing.lg, background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    listItem: { marginBottom: theme.spacing.md, padding: theme.spacing.lg, background: theme.colors.bgCard, border: `1px solid ${theme.colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing.md },
     btnEdit: { padding: `${theme.spacing.sm} ${theme.spacing.md}`, background: theme.colors.bgHover, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, cursor: 'pointer', fontFamily: theme.fonts.body, textDecoration: 'none', display: 'inline-block' },
     modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
     modal: { background: theme.colors.bgCard, padding: theme.spacing.xl, maxWidth: '520px', width: '90%', maxHeight: '90vh', overflow: 'auto', border: `1px solid ${theme.colors.border}` },
     modalTitle: { fontSize: '1.5rem', fontWeight: 600, marginBottom: theme.spacing.lg, color: theme.colors.text },
+    textarea: { width: '100%', minHeight: '200px', padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body, fontSize: '0.875rem', resize: 'vertical' },
+    hint: { fontSize: '0.875rem', color: theme.colors.textMuted, marginBottom: theme.spacing.md },
     input: { width: '100%', marginBottom: theme.spacing.md, padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
     label: { display: 'block', marginBottom: theme.spacing.md, color: theme.colors.text, fontFamily: theme.fonts.body },
     inputNumber: { marginLeft: theme.spacing.sm, padding: theme.spacing.md, background: theme.colors.bg, border: `1px solid ${theme.colors.border}`, color: theme.colors.text, fontFamily: theme.fonts.body },
@@ -84,19 +107,46 @@ export default function Tests() {
         <ul style={s.list}>
           {tests.map((t) => (
             <li key={t._id} style={s.listItem}>
-              <div>
+              <div style={{ flex: 1 }}>
                 <strong>{t.title}</strong> - {t.durationMinutes} min - {t.questions?.length || 0} questions
+                {t.allowedEmails && t.allowedEmails.length > 0 && (
+                  <div style={{ fontSize: '0.875rem', color: theme.colors.textMuted, marginTop: theme.spacing.xs }}>
+                    {t.allowedEmails.length} email{t.allowedEmails.length !== 1 ? 's' : ''} allowed
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'flex', gap: theme.spacing.sm }}>
+              <div style={{ display: 'flex', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => openEmailsModal(t)} style={s.btnEdit}>
+                  {t.allowedEmails && t.allowedEmails.length > 0 ? 'Edit Access' : 'Add Access'}
+                </button>
                 <Link to={`/test/${t.testUrl}`} target="_blank" style={s.btnEdit}>Preview</Link>
                 <button type="button" onClick={() => copyTestUrl(t)} style={s.btnEdit}>
                   {copiedId === t._id ? 'Copied!' : 'Copy URL'}
                 </button>
                 <Link to={`/${orgSlug}/${userRole}/tests/${t._id}/edit`} style={s.btnEdit}>Edit</Link>
+                <Link to={`/${orgSlug}/${userRole}/tests/${t._id}/submissions`} style={s.btnEdit}>View Submissions</Link>
               </div>
             </li>
           ))}
         </ul>
+      )}
+      {editingEmailsId && (
+        <div style={s.modalOverlay} onClick={() => setEditingEmailsId(null)}>
+          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 style={s.modalTitle}>Manage Email Access</h2>
+            <p style={s.hint}>Enter one email per line. Only these emails will be able to access this test.</p>
+            <textarea
+              value={emailsText}
+              onChange={(e) => setEmailsText(e.target.value)}
+              placeholder="email1@example.com&#10;email2@example.com&#10;email3@example.com"
+              style={s.textarea}
+            />
+            <div style={s.actions}>
+              <button type="button" onClick={() => setEditingEmailsId(null)} style={s.btnCancel}>Cancel</button>
+              <button type="button" onClick={saveEmails} style={s.btnPrimary}>Save</button>
+            </div>
+          </div>
+        </div>
       )}
     </DashboardLayout>
   );

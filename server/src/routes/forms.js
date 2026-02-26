@@ -213,7 +213,7 @@ router.patch('/submissions/:id/status', requireOrgStaff, async (req, res) => {
  * Update submission test link. Staff only.
  */
 router.patch('/submissions/:id/test-link', requireOrgStaff, async (req, res) => {
-  const { testLink, testStartDate, testEndDate } = req.body;
+  const { testLink, testStartDate, testEndDate, maxAttempts } = req.body;
   const submission = await FormSubmission.findById(req.params.id);
   if (!submission) return res.status(404).json({ error: 'Submission not found' });
   
@@ -225,6 +225,7 @@ router.patch('/submissions/:id/test-link', requireOrgStaff, async (req, res) => 
   submission.testLink = testLink;
   submission.testStartDate = testStartDate;
   submission.testEndDate = testEndDate;
+  if (maxAttempts !== undefined) submission.maxAttempts = maxAttempts;
   await submission.save();
   res.json({ submission });
 });

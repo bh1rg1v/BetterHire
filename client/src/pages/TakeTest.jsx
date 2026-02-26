@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -16,6 +16,35 @@ export default function TakeTest() {
   const [answers, setAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+  const submittedRef = useRef(false);
+  const initialCheckDone = useRef(false);
+
+  useEffect(() => {
+    async function checkIncompleteSession() {
+      if (initialCheckDone.current) return;
+      initialCheckDone.current = true;
+      
+      const sessionKey = `test_session_${testUrl}`;
+      const savedSession = localStorage.getItem(sessionKey);
+      
+      if (savedSession && !submittedRef.current) {
+        submittedRef.current = true;
+        const session = JSON.parse(savedSession);
+        localStorage.removeItem(sessionKey);
+        try {
+          await api.api(`/tests/url/${testUrl}/submit`, {
+            method: 'POST',
+            body: { answers: session.answers || {} }
+          });
+        } catch (e) {
+          console.error('Failed to submit incomplete test:', e);
+        }
+        navigate(`/test/${testUrl}`);
+      }
+    }
+    checkIncompleteSession();
+  }, [testUrl, navigate]);
 
   useEffect(() => {
     async function loadTest() {
@@ -28,6 +57,12 @@ export default function TakeTest() {
         if (questionId && res.test.questions) {
           const idx = res.test.questions.findIndex(q => (q._id || q.questionId?._id) === questionId);
           if (idx >= 0) setCurrentQuestionIndex(idx);
+        }
+        
+        const sessionKey = `test_session_${testUrl}`;
+        const existing = localStorage.getItem(sessionKey);
+        if (!existing) {
+          localStorage.setItem(sessionKey, JSON.stringify({ answers: {}, startedAt: Date.now() }));
         }
       } catch (e) {
         setError(e.message || 'Test not found');
@@ -54,8 +89,23 @@ export default function TakeTest() {
     return () => clearInterval(timer);
   }, [timeLeft]);
 
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = 'If you refresh, the test will be submitted';
+      return 'If you refresh, the test will be submitted';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   const handleAnswerChange = (questionId, value) => {
-    setAnswers(prev => ({ ...prev, [questionId]: value }));
+    const newAnswers = { ...answers, [questionId]: value };
+    setAnswers(newAnswers);
+    // Update session storage
+    const sessionKey = `test_session_${testUrl}`;
+    localStorage.setItem(sessionKey, JSON.stringify({ answers: newAnswers, startedAt: Date.now() }));
   };
 
   const handleNext = () => {
@@ -79,11 +129,15 @@ export default function TakeTest() {
     setSubmitting(true);
     
     try {
-      alert('Test submitted successfully!');
-      navigate(`/test/${testUrl}`);
+      const res = await api.api(`/tests/url/${testUrl}/submit`, {
+        method: 'POST',
+        body: { answers }
+      });
+      // Clear session on successful submit
+      localStorage.removeItem(`test_session_${testUrl}`);
+      setResult(res);
     } catch (e) {
       setError(e.message || 'Failed to submit test');
-    } finally {
       setSubmitting(false);
     }
   };
@@ -101,10 +155,48 @@ export default function TakeTest() {
       color: theme.colors.text,
       fontFamily: theme.fonts.body,
       padding: theme.spacing.xl,
-    },
-    container: {
-      maxWidth: '800px',
+      display: 'flex',
+      gap: '2rem',
+      maxWidth: '1400px',
       margin: '0 auto',
+    },
+    sidebar: {
+      width: '200px',
+      flexShrink: 0,
+    },
+    questionNav: {
+      background: theme.colors.bgCard,
+      padding: theme.spacing.lg,
+      border: `1px solid ${theme.colors.border}`,
+      borderRadius: '8px',
+      position: 'sticky',
+      top: theme.spacing.xl,
+    },
+    navTitle: {
+      fontSize: '0.875rem',
+      fontWeight: 600,
+      marginBottom: theme.spacing.md,
+      color: theme.colors.textMuted,
+    },
+    questionGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: theme.spacing.sm,
+    },
+    questionBtn: (isActive, isAnswered) => ({
+      padding: '0.5rem',
+      background: isActive ? '#ffffff' : isAnswered ? theme.colors.primary : theme.colors.bg,
+      color: isActive ? '#000000' : isAnswered ? '#fff' : theme.colors.text,
+      border: `1px solid ${isActive ? '#ffffff' : isAnswered ? theme.colors.primary : theme.colors.border}`,
+      borderRadius: '4px',
+      cursor: 'pointer',
+      fontSize: '0.875rem',
+      fontWeight: 500,
+      transition: 'all 0.2s',
+    }),
+    container: {
+      flex: 1,
+      minWidth: 0,
     },
     header: {
       display: 'flex',
@@ -152,11 +244,22 @@ export default function TakeTest() {
       display: 'flex',
       alignItems: 'center',
       marginBottom: theme.spacing.sm,
-      padding: theme.spacing.sm,
+      padding: theme.spacing.md,
       cursor: 'pointer',
+      background: theme.colors.bg,
+      border: `1px solid ${theme.colors.border}`,
+      transition: 'all 0.2s',
+    },
+    optionHover: {
+      background: theme.colors.bgHover,
+      borderColor: theme.colors.primary,
     },
     radio: {
-      marginRight: theme.spacing.sm,
+      width: '20px',
+      height: '20px',
+      marginRight: theme.spacing.md,
+      cursor: 'pointer',
+      accentColor: theme.colors.primary,
     },
     textarea: {
       width: '100%',
@@ -206,6 +309,35 @@ export default function TakeTest() {
     },
   };
 
+  if (result) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.container}>
+          <div style={styles.header}>
+            <h1 style={styles.title}>Test Completed!</h1>
+          </div>
+          <div style={styles.question}>
+            <h2 style={{ marginBottom: theme.spacing.lg }}>Your Results</h2>
+            <div style={{ fontSize: '1.2rem', marginBottom: theme.spacing.md }}>
+              <strong>Score:</strong> {result.totalScore !== null ? result.totalScore : result.autoScore} points
+            </div>
+            {result.manualRequired && (
+              <div style={{ fontSize: '1rem', color: theme.colors.textMuted, marginBottom: theme.spacing.md }}>
+                Some questions require manual evaluation. Your final score will be updated once reviewed.
+              </div>
+            )}
+            <div style={{ fontSize: '1rem', color: theme.colors.textMuted, marginTop: theme.spacing.xl }}>
+              You have used one attempt. Please check the test overview to see your remaining attempts.
+            </div>
+          </div>
+          <button onClick={() => navigate(`/test/${testUrl}`)} style={styles.button}>
+            Back to Test Overview
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div style={styles.page}>
@@ -248,8 +380,35 @@ export default function TakeTest() {
   const question = currentQuestion.questionId || currentQuestion;
   const questionIdKey = question._id;
 
+  const handleQuestionNavigation = (index) => {
+    const targetQuestion = test.questions[index];
+    const targetQuestionId = targetQuestion._id || targetQuestion.questionId?._id;
+    navigate(`/test/${testUrl}/${targetQuestionId}`);
+  };
+
   return (
     <div style={styles.page}>
+      <div style={styles.sidebar}>
+        <div style={styles.questionNav}>
+          <div style={styles.navTitle}>QUESTIONS</div>
+          <div style={styles.questionGrid}>
+            {test.questions.map((q, idx) => {
+              const qId = q._id || q.questionId?._id;
+              const isAnswered = answers[qId] !== undefined && answers[qId] !== '';
+              const isActive = idx === currentQuestionIndex;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleQuestionNavigation(idx)}
+                  style={styles.questionBtn(isActive, isAnswered)}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
       <div style={styles.container}>
         <div style={styles.header}>
           <h1 style={styles.title}>{test.title}</h1>
@@ -272,19 +431,28 @@ export default function TakeTest() {
           
           {question.type === 'mcq' && question.options && (
             <div>
-              {question.options.map((option, optIndex) => (
-                <label key={optIndex} style={styles.option}>
-                  <input
-                    type="radio"
-                    name={`q${questionIdKey}`}
-                    value={optIndex}
-                    checked={answers[questionIdKey] == optIndex}
-                    onChange={(e) => handleAnswerChange(questionIdKey, parseInt(e.target.value))}
-                    style={styles.radio}
-                  />
-                  {option.text}
-                </label>
-              ))}
+              {question.options.map((option, optIndex) => {
+                const isSelected = answers[questionIdKey] == optIndex;
+                return (
+                  <label 
+                    key={optIndex} 
+                    style={{
+                      ...styles.option,
+                      ...(isSelected ? styles.optionHover : {})
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name={`q${questionIdKey}`}
+                      value={optIndex}
+                      checked={isSelected}
+                      onChange={(e) => handleAnswerChange(questionIdKey, parseInt(e.target.value))}
+                      style={styles.radio}
+                    />
+                    {option.text}
+                  </label>
+                );
+              })}
             </div>
           )}
           
