@@ -1,0 +1,11 @@
+Question,OptionA,OptionB,OptionC,OptionD,Answer,Tags
+Which OOP principle restricts direct access to data members?,Abstraction,Encapsulation,Polymorphism,Inheritance,B,OOPS
+Which type of polymorphism is achieved using method overloading?,Runtime Polymorphism,Dynamic Binding,Compile-time Polymorphism,Method Overriding,C,OOPS
+Which SQL constraint ensures uniqueness of values in a column?,FOREIGN KEY,PRIMARY KEY,CHECK,DEFAULT,B,DBMS
+Which normal form ensures no transitive dependency exists?,1NF,2NF,3NF,BCNF,C,DBMS
+Which scheduling algorithm allocates CPU in cyclic order?,SJF,Priority Scheduling,Round Robin,FCFS,C,OS
+Which memory management technique suffers from external fragmentation?,Paging,Segmentation,Virtual Memory,Caching,B,OS
+Which OSI layer is responsible for error detection and correction?,Physical,Data Link,Session,Presentation,B,CN
+Which protocol is used for reliable data transfer over the Internet?,UDP,ICMP,TCP,ARP,C,CN
+What is the probability of getting exactly one head when tossing two fair coins?,4-Jan,2-Jan,4-Mar,1,B,Probability
+"If X ~ Bernoulli(p), what is E[X]?",0,p,1,p(1-p),B,Statistics
