@@ -12,6 +12,10 @@ const formSubmissionSchema = new mongoose.Schema(
     status: { type: String, enum: APPLICATION_STATUS, default: 'submitted' },
     /** Optional resume file URL (Phase 6). */
     resumeUrl: { type: String, trim: true, default: '' },
+    /** Test link for shortlisted candidates */
+    testLink: { type: String, trim: true, default: '' },
+    testStartDate: { type: Date, default: null },
+    testEndDate: { type: Date, default: null }
   },
   { timestamps: true }
 );

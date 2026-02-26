@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useOrg } from '../context/OrgContext';
 import { Sidebar } from '../components/layout/Sidebar';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
@@ -11,6 +12,7 @@ const FIELD_TYPES = ['text', 'email', 'number', 'textarea', 'select', 'checkbox'
 export default function FormsBuilder() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { organization } = useOrg();
   const navigate = useNavigate();
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,22 +20,23 @@ export default function FormsBuilder() {
   const [copiedId, setCopiedId] = useState(null);
 
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
+  const orgSlug = organization?.slug;
+  const userRole = user?.role?.toLowerCase();
 
   const getNavItems = () => {
+    if (!orgSlug) return [];
     const items = [
-      { path: '/dashboard', label: 'Dashboard' },
-      ...(user?.role === 'Admin' ? [{ path: '/dashboard/admin', label: 'Organization' }] : []),
-      { path: '/dashboard/manager', label: 'Positions' },
+      { path: `/${orgSlug}/${userRole}/dashboard`, label: 'Dashboard' },
     ];
     if (canEdit) {
       items.push(
-        { path: '/dashboard/forms', label: 'Forms' },
-        { path: '/dashboard/questions', label: 'Questions' },
-        { path: '/dashboard/tests', label: 'Tests' }
+        { path: `/${orgSlug}/${userRole}/forms`, label: 'Forms' },
+        { path: `/${orgSlug}/${userRole}/questions`, label: 'Questions' },
+        { path: `/${orgSlug}/${userRole}/tests`, label: 'Tests' }
       );
     }
     items.push(
-      { path: '/dashboard/analytics', label: 'Analytics' },
+      { path: `/${orgSlug}/${userRole}/analytics`, label: 'Analytics' },
       { path: '/dashboard/profile', label: 'Profile' }
     );
     return items;
@@ -76,13 +79,13 @@ export default function FormsBuilder() {
     <DashboardLayout sidebar={<Sidebar items={getNavItems()} />}>
       <div style={s.header}>
         <h1 style={s.title}>Form Builder</h1>
-        <button type="button" onClick={() => navigate('/dashboard/forms/create')} style={s.btn}>Create Form</button>
+        <button type="button" onClick={() => navigate(`/${orgSlug}/${userRole}/forms/create`)} style={s.btn}>Create Form</button>
       </div>
       {error && <div style={s.error}>{error}</div>}
       {loading ? <p>Loading...</p> : forms.length === 0 ? (
         <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
           <p style={{ fontSize: '1.25rem', color: theme.colors.textMuted, marginBottom: theme.spacing.lg }}>No forms created yet</p>
-          <button type="button" onClick={() => navigate('/dashboard/forms/create')} style={s.btn}>Create First Form</button>
+          <button type="button" onClick={() => navigate(`/${orgSlug}/${userRole}/forms/create`)} style={s.btn}>Create First Form</button>
         </div>
       ) : (
         <ul style={s.list}>
@@ -93,8 +96,8 @@ export default function FormsBuilder() {
                 <button type="button" onClick={() => copyUrl(f.formUrl)} style={s.btnSmall}>
                   {copiedId === f.formUrl ? 'URL Copied!' : 'Copy URL'}
                 </button>
-                <Link to={`/dashboard/forms/${f.formUrl}/submissions`} style={s.btnSmall}>View Applicants</Link>
-                <Link to={`/dashboard/forms/${f.formUrl}/edit`} style={s.btnSmall}>Edit</Link>
+                <Link to={`/${orgSlug}/${userRole}/forms/${f.formUrl}/submissions`} style={s.btnSmall}>View Applicants</Link>
+                <Link to={`/${orgSlug}/${userRole}/forms/${f.formUrl}/edit`} style={s.btnSmall}>Edit</Link>
               </div>
             </li>
           ))}

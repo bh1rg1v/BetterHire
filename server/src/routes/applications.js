@@ -77,10 +77,36 @@ router.post('/', requireAuth, requireRole([ROLES.APPLICANT]), async (req, res, n
 router.get('/me', requireAuth, requireRole([ROLES.APPLICANT]), async (req, res) => {
   const submissions = await FormSubmission.find({ applicantId: req.user._id })
     .populate({ path: 'positionId', select: 'title status testId', populate: { path: 'organizationId', select: 'name' } })
-    .populate('formId', 'name')
+    .populate({ path: 'formId', select: 'name', populate: { path: 'organizationId', select: 'name' } })
     .sort({ createdAt: -1 })
     .lean();
+  
+  // For submissions without positionId, try to find position through form
+  for (let submission of submissions) {
+    if (!submission.positionId && submission.formId) {
+      const Position = require('../models/Position');
+      const position = await Position.findOne({ formId: submission.formId._id }).select('title').lean();
+      if (position) {
+        submission.positionFromForm = position;
+      }
+    }
+  }
+  
   res.json({ submissions });
+});
+
+/**
+ * GET /api/applications/me/:id
+ * Get single application by applicant. Applicant only.
+ */
+router.get('/me/:id', requireAuth, requireRole([ROLES.APPLICANT]), async (req, res) => {
+  const submission = await FormSubmission.findOne({ _id: req.params.id, applicantId: req.user._id })
+    .populate('applicantId', 'name email')
+    .populate('positionId', 'title')
+    .populate('formId', 'name schema')
+    .lean();
+  if (!submission) return res.status(404).json({ error: 'Application not found' });
+  res.json({ submission });
 });
 
 /**
@@ -120,6 +146,49 @@ router.get('/form/:formUrl', async (req, res) => {
     organization: form.organizationId,
     position: position ? { title: position.title } : null,
   });
+});
+
+/**
+ * PATCH /api/applications/:id
+ * Applicant updates their own application (only if status is 'submitted')
+ */
+router.patch('/:id', requireAuth, requireRole([ROLES.APPLICANT]), async (req, res, next) => {
+  try {
+    const { data } = req.body;
+    if (!data || typeof data !== 'object') return res.status(400).json({ error: 'data is required' });
+
+    const submission = await FormSubmission.findOne({ _id: req.params.id, applicantId: req.user._id });
+    if (!submission) return res.status(404).json({ error: 'Application not found' });
+    if (submission.status !== 'submitted') return res.status(400).json({ error: 'Cannot edit application after review has started' });
+
+    const form = await Form.findById(submission.formId);
+    if (!form) return res.status(400).json({ error: 'Form not found' });
+
+    const schema = form.schema || { fields: [] };
+    const fields = schema.fields || [];
+    const errors = [];
+    const normalizedData = {};
+    for (const field of fields) {
+      const val = data[field.id];
+      const empty = val === undefined || val === null || String(val).trim() === '';
+      if (field.required && empty) {
+        errors.push(`${field.label || field.id} is required`);
+      }
+      normalizedData[field.id] = val == null ? '' : String(val).trim();
+    }
+    if (errors.length) return res.status(400).json({ error: 'Validation failed', details: errors });
+
+    submission.data = normalizedData;
+    await submission.save();
+
+    const populated = await FormSubmission.findById(submission._id)
+      .populate('applicantId', 'name email')
+      .populate('positionId', 'title')
+      .lean();
+    res.json({ submission: populated });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

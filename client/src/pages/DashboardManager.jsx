@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useOrg } from '../context/OrgContext';
 import { Sidebar } from '../components/layout/Sidebar';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
@@ -15,6 +16,7 @@ const STATUS_OPTIONS = [
 export default function DashboardManager() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { organization } = useOrg();
   const navigate = useNavigate();
   const [positions, setPositions] = useState([]);
   const [managers, setManagers] = useState([]);
@@ -26,23 +28,25 @@ export default function DashboardManager() {
   const [statusFilter, setStatusFilter] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
+  const orgSlug = organization?.slug;
+  const userRole = user?.role?.toLowerCase();
+
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
 
   const getNavItems = () => {
+    if (!orgSlug) return [];
     const items = [
-      { path: '/dashboard', label: 'Dashboard' },
-      ...(user?.role === 'Admin' ? [{ path: '/dashboard/admin', label: 'Organization' }] : []),
-      { path: '/dashboard/manager', label: 'Positions' },
+      { path: `/${orgSlug}/${userRole}/dashboard`, label: 'Dashboard' },
     ];
     if (canEdit) {
       items.push(
-        { path: '/dashboard/forms', label: 'Forms' },
-        { path: '/dashboard/questions', label: 'Questions' },
-        { path: '/dashboard/tests', label: 'Tests' }
+        { path: `/${orgSlug}/${userRole}/forms`, label: 'Forms' },
+        { path: `/${orgSlug}/${userRole}/questions`, label: 'Questions' },
+        { path: `/${orgSlug}/${userRole}/tests`, label: 'Tests' }
       );
     }
     items.push(
-      { path: '/dashboard/analytics', label: 'Analytics' },
+      { path: `/${orgSlug}/${userRole}/analytics`, label: 'Analytics' },
       { path: '/dashboard/profile', label: 'Profile' }
     );
     return items;
@@ -127,7 +131,7 @@ export default function DashboardManager() {
           {!canEdit && <p style={s.warning}>Contact Admin to get "Can post jobs" permission</p>}
         </div>
         {canEdit && (
-          <button onClick={() => navigate('/dashboard/positions/create')} style={s.btnPrimary}>
+          <button onClick={() => navigate(`/${orgSlug}/${userRole}/positions/create`)} style={s.btnPrimary}>
             Create Position
           </button>
         )}
@@ -152,7 +156,7 @@ export default function DashboardManager() {
       {loading ? <p>Loading...</p> : positions.length === 0 ? (
         <div style={s.empty}>
           <p style={s.emptyText}>No positions yet</p>
-          {canEdit && <button onClick={() => navigate('/dashboard/positions/create')} style={s.btnPrimary}>Create First Position</button>}
+          {canEdit && <button onClick={() => navigate(`/${orgSlug}/${userRole}/positions/create`)} style={s.btnPrimary}>Create First Position</button>}
         </div>
       ) : (
         <div style={s.grid}>
@@ -173,7 +177,7 @@ export default function DashboardManager() {
               <div style={s.cardActions}>
                 {canEdit && (
                   <>
-                    <Link to={`/dashboard/positions/${p.positionUrl}/edit`} style={s.btnSmall}>Edit</Link>
+                    <Link to={`/${orgSlug}/${userRole}/positions/${p.positionUrl}/edit`} style={s.btnSmall}>Edit</Link>
                     <button onClick={() => {
                       navigator.clipboard.writeText(`${window.location.origin}/job/${p.positionUrl}`);
                       setCopiedId(p._id);

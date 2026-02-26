@@ -1,17 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useOrg } from '../context/OrgContext';
 import { Sidebar } from '../components/layout/Sidebar';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
 
 export default function Analytics() {
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const { organization } = useOrg();
   const [funnel, setFunnel] = useState({});
   const [testMetrics, setTestMetrics] = useState(null);
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const orgSlug = organization?.slug;
+  const userRole = user?.role?.toLowerCase();
 
   useEffect(() => {
     if (!user || (user.role !== 'Admin' && user.role !== 'Manager')) return;
@@ -42,13 +48,11 @@ export default function Analytics() {
     }
   }
 
-  const { theme } = useTheme();
-
-  const navItems = user?.role === 'Admin'
-    ? [{ label: 'Dashboard', path: '/dashboard/admin' }, { label: 'Organization', path: '/dashboard/organization' }, { label: 'Positions', path: '/dashboard/manager' }, { label: 'Forms', path: '/dashboard/forms' }, { label: 'Questions', path: '/dashboard/questions' }, { label: 'Tests', path: '/dashboard/tests' }, { label: 'Analytics', path: '/dashboard/analytics' }, { label: 'Profile', path: '/dashboard/profile' }]
+  const navItems = !orgSlug ? [] : user?.role === 'Admin'
+    ? [{ label: 'Dashboard', path: `/${orgSlug}/admin/dashboard` }, { label: 'Forms', path: `/${orgSlug}/admin/forms` }, { label: 'Questions', path: `/${orgSlug}/admin/questions` }, { label: 'Tests', path: `/${orgSlug}/admin/tests` }, { label: 'Analytics', path: `/${orgSlug}/admin/analytics` }, { label: 'Profile', path: '/dashboard/profile' }]
     : user?.canPostJobs
-    ? [{ label: 'Dashboard', path: '/dashboard/manager' }, { label: 'Positions', path: '/dashboard/manager' }, { label: 'Forms', path: '/dashboard/forms' }, { label: 'Questions', path: '/dashboard/questions' }, { label: 'Tests', path: '/dashboard/tests' }, { label: 'Analytics', path: '/dashboard/analytics' }, { label: 'Profile', path: '/dashboard/profile' }]
-    : [{ label: 'Dashboard', path: '/dashboard/manager' }, { label: 'Profile', path: '/dashboard/profile' }];
+    ? [{ label: 'Dashboard', path: `/${orgSlug}/manager/dashboard` }, { label: 'Forms', path: `/${orgSlug}/manager/forms` }, { label: 'Questions', path: `/${orgSlug}/manager/questions` }, { label: 'Tests', path: `/${orgSlug}/manager/tests` }, { label: 'Analytics', path: `/${orgSlug}/manager/analytics` }, { label: 'Profile', path: '/dashboard/profile' }]
+    : [{ label: 'Dashboard', path: `/${orgSlug}/manager/dashboard` }, { label: 'Profile', path: '/dashboard/profile' }];
 
   if (!user || (user.role !== 'Admin' && user.role !== 'Manager')) {
     return <DashboardLayout sidebar={<Sidebar items={navItems} />}><div style={{ padding: '2rem' }}><p>Access denied.</p></div></DashboardLayout>;

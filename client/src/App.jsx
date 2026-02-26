@@ -19,16 +19,21 @@ import FormCreate from './pages/FormCreate';
 import FormEdit from './pages/FormEdit';
 import FormSubmissions from './pages/FormSubmissions';
 import SubmissionView from './pages/SubmissionView';
+import SubmissionEdit from './pages/SubmissionEdit';
 import PositionSubmissions from './pages/PositionSubmissions';
 import PositionAttempts from './pages/PositionAttempts';
 import Questions from './pages/Questions';
 import Tests from './pages/Tests';
 import TestCreate from './pages/TestCreate';
 import TestEdit from './pages/TestEdit';
-import TakeTest from './pages/TakeTest';
+import TestOverview from './pages/TestOverview';
 import Analytics from './pages/Analytics';
 import PositionCreate from './pages/PositionCreate';
 import PositionEdit from './pages/PositionEdit';
+import SuperAdmin from './pages/SuperAdmin';
+import SuperAdminUsers from './pages/SuperAdminUsers';
+import SuperAdminOrganizations from './pages/SuperAdminOrganizations';
+import { OrgProvider } from './context/OrgContext';
 
 import PublicProfile from './pages/PublicProfile';
 
@@ -40,62 +45,57 @@ function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<GuestOnlyRoute><Login /></GuestOnlyRoute>} />
       <Route path="/register" element={<GuestOnlyRoute><Register /></GuestOnlyRoute>} />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/admin"
-        element={
-          <ProtectedRoute allowedRoles={['Admin']}>
-            <DashboardAdmin />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/dashboard/superadmin" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdmin /></ProtectedRoute>} />
+      <Route path="/dashboard/superadmin/users" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminUsers /></ProtectedRoute>} />
+      <Route path="/dashboard/superadmin/organizations" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminOrganizations /></ProtectedRoute>} />
+      <Route path="/dashboard/applicant" element={<ProtectedRoute allowedRoles={['Applicant']}><DashboardApplicant /></ProtectedRoute>} />
+      <Route path="/dashboard/submissions/:id" element={<ProtectedRoute allowedRoles={['Applicant']}><SubmissionView /></ProtectedRoute>} />
+      <Route path="/dashboard/submissions/:id/edit" element={<ProtectedRoute allowedRoles={['Applicant']}><SubmissionEdit /></ProtectedRoute>} />
+      <Route path="/dashboard/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/invite/accept" element={<InviteAccept />} />
       <Route path="/jobs" element={<JobsPublic />} />
       <Route path="/job/:id" element={<JobPublic />} />
       <Route path="/apply/:positionId" element={<ProtectedRoute allowedRoles={['Applicant']}><Apply /></ProtectedRoute>} />
       <Route path="/apply/form/:formUrl" element={<Apply />} />
-      <Route path="/dashboard/applicant" element={<ProtectedRoute allowedRoles={['Applicant']}><DashboardApplicant /></ProtectedRoute>} />
-      <Route path="/dashboard/forms" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><FormsBuilder /></ProtectedRoute>} />
-      <Route path="/dashboard/forms/create" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><FormCreate /></ProtectedRoute>} />
-      <Route path="/dashboard/forms/:formUrl/submissions" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><FormSubmissions /></ProtectedRoute>} />
-      <Route path="/dashboard/forms/:formUrl/edit" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><FormEdit /></ProtectedRoute>} />
-      <Route path="/dashboard/submissions/:id" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><SubmissionView /></ProtectedRoute>} />
-      <Route path="/dashboard/positions/:positionId/submissions" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><PositionSubmissions /></ProtectedRoute>} />
-      <Route path="/dashboard/positions/:positionId/attempts" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><PositionAttempts /></ProtectedRoute>} />
-      <Route path="/dashboard/questions" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><Questions /></ProtectedRoute>} />
-      <Route path="/dashboard/tests" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><Tests /></ProtectedRoute>} />
-      <Route path="/dashboard/tests/create" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><TestCreate /></ProtectedRoute>} />
-      <Route path="/dashboard/tests/:id/edit" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><TestEdit /></ProtectedRoute>} />
-      <Route path="/dashboard/positions/create" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><PositionCreate /></ProtectedRoute>} />
-      <Route path="/dashboard/positions/:positionUrl/edit" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><PositionEdit /></ProtectedRoute>} />
-      <Route path="/test/:testUrl/:questionId" element={<TakeTest />} />
-      <Route path="/test/:testUrl" element={<TakeTest />} />
-      <Route path="/dashboard/analytics" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><Analytics /></ProtectedRoute>} />
-      <Route
-        path="/dashboard/manager"
-        element={
-          <ProtectedRoute allowedRoles={['Admin', 'Manager']}>
-            <DashboardManager />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/profile"
-        element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        }
-      />
       <Route path="/join-organization" element={<ProtectedRoute allowedRoles={['Manager']}><JoinOrganization /></ProtectedRoute>} />
       <Route path="/users/:username" element={<PublicProfile />} />
+      <Route path="/test/:testUrl/:questionId" element={<TakeTest />} />
+      <Route path="/test/:testUrl/take" element={<TakeTest />} />
+      <Route path="/test/:testUrl" element={<TestOverview />} />
+      
+      {/* Organization-based routes */}
+      <Route path="/:orgHandle/admin/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><DashboardManager /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/dashboard" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><DashboardManager /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/jobs" element={<OrgProvider><JobsPublic /></OrgProvider>} />
+      <Route path="/:orgHandle/admin/forms" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><FormsBuilder /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/forms" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><FormsBuilder /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/forms/create" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><FormCreate /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/forms/create" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><FormCreate /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/forms/:formUrl/edit" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><FormEdit /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/forms/:formUrl/edit" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><FormEdit /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/forms/:formUrl/submissions" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><FormSubmissions /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/forms/:formUrl/submissions" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><FormSubmissions /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/questions" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><Questions /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/questions" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><Questions /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/tests" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><Tests /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/tests" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><Tests /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/tests/create" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><TestCreate /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/tests/create" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><TestCreate /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/tests/:id/edit" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><TestEdit /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/tests/:id/edit" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><TestEdit /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/positions/create" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><PositionCreate /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/positions/create" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><PositionCreate /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/positions/:positionUrl/edit" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><PositionEdit /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/positions/:positionUrl/edit" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><PositionEdit /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/analytics" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><Analytics /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/analytics" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><Analytics /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/submissions/:id" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><SubmissionView /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/submissions/:id" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><SubmissionView /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/positions/:positionId/submissions" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><PositionSubmissions /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/positions/:positionId/submissions" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><PositionSubmissions /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/admin/positions/:positionId/attempts" element={<ProtectedRoute allowedRoles={['Admin']}><OrgProvider><PositionAttempts /></OrgProvider></ProtectedRoute>} />
+      <Route path="/:orgHandle/manager/positions/:positionId/attempts" element={<ProtectedRoute allowedRoles={['Admin', 'Manager']}><OrgProvider><PositionAttempts /></OrgProvider></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

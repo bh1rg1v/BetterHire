@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const Test = require('../models/Test');
 const Question = require('../models/Question');
-const { requireOrgStaff, requireCanPostJobs } = require('../middleware/auth');
+const { requireOrgStaff, requireCanPostJobs, authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -36,7 +36,7 @@ router.get('/', requireOrgStaff, async (req, res) => {
  */
 router.post('/', requireCanPostJobs, async (req, res, next) => {
   try {
-    const { title, description, durationMinutes, questions, testUrl } = req.body;
+    const { title, description, durationMinutes, questions, testUrl, maxAttempts } = req.body;
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'Title is required' });
     const finalTestUrl = await ensureUniqueTestUrl(testUrl);
     const questionRefs = [];
@@ -58,6 +58,7 @@ router.post('/', requireCanPostJobs, async (req, res, next) => {
       description: String(description || '').trim(),
       testUrl: finalTestUrl,
       durationMinutes: typeof durationMinutes === 'number' && durationMinutes >= 0 ? durationMinutes : 0,
+      maxAttempts: typeof maxAttempts === 'number' && maxAttempts >= 1 ? maxAttempts : 1,
       questions: questionRefs,
       createdBy: req.user._id,
     });
@@ -97,10 +98,11 @@ router.patch('/:id', requireCanPostJobs, async (req, res, next) => {
       organizationId: req.organizationId,
     });
     if (!test) return res.status(404).json({ error: 'Test not found' });
-    const { title, description, durationMinutes, questions, testUrl } = req.body;
+    const { title, description, durationMinutes, questions, testUrl, maxAttempts } = req.body;
     if (title !== undefined) test.title = String(title).trim();
     if (description !== undefined) test.description = String(description).trim();
     if (typeof durationMinutes === 'number' && durationMinutes >= 0) test.durationMinutes = durationMinutes;
+    if (typeof maxAttempts === 'number' && maxAttempts >= 1) test.maxAttempts = maxAttempts;
     if (testUrl !== undefined && testUrl !== test.testUrl) {
       test.testUrl = await ensureUniqueTestUrl(testUrl);
     }
@@ -148,13 +150,89 @@ router.delete('/:id', requireCanPostJobs, async (req, res, next) => {
 
 /**
  * GET /api/tests/url/:testUrl
- * Public route to get test by URL
+ * Restricted route - shortlisted applicants with valid test links or org staff can access
  */
-router.get('/url/:testUrl', async (req, res) => {
+router.get('/url/:testUrl', authenticate, async (req, res) => {
+  const FormSubmission = require('../models/FormSubmission');
+  const TestAttempt = require('../models/TestAttempt');
+  const { ROLES } = require('../constants/roles');
+  
   const test = await Test.findOne({ testUrl: req.params.testUrl })
     .populate('questions.questionId')
     .lean();
+  console.log('Looking for test with URL:', req.params.testUrl);
+  console.log('Found test:', test ? 'YES' : 'NO');
   if (!test) return res.status(404).json({ error: 'Test not found' });
+  
+  const isStaff = req.user && [ROLES.ADMIN, ROLES.MANAGER].includes(req.user.role) && req.user.organizationId && (req.user.organizationId._id?.toString() || req.user.organizationId.toString()) === test.organizationId.toString();
+  
+  // If no specific question ID, return test overview with attempts count
+  if (!req.query.questionId && !req.params.questionId) {
+    let attemptsCount = 0;
+    if (req.user && req.user.role === ROLES.APPLICANT) {
+      attemptsCount = await TestAttempt.countDocuments({ testId: test._id, applicantId: req.user._id });
+    }
+    return res.json({ 
+      test: { 
+        _id: test._id, 
+        title: test.title, 
+        durationMinutes: test.durationMinutes, 
+        maxAttempts: test.maxAttempts,
+        questionsCount: test.questions.length 
+      },
+      attemptsCount
+    });
+  }
+  
+  if (!isStaff) {
+    if (!req.user || req.user.role !== ROLES.APPLICANT) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+    
+    // Check for test link access first
+    const testLinkSubmission = await FormSubmission.findOne({
+      applicantId: req.user._id,
+      testLink: { $regex: `/test/${req.params.testUrl}`, $options: 'i' },
+      status: 'shortlisted'
+    }).lean();
+    
+    console.log('Checking test link access for user:', req.user._id, 'testUrl:', req.params.testUrl);
+    console.log('Found test link submission:', testLinkSubmission);
+    
+    if (testLinkSubmission) {
+      // Validate test link dates
+      const now = new Date();
+      const startDate = new Date(testLinkSubmission.testStartDate);
+      const endDate = new Date(testLinkSubmission.testEndDate);
+      
+      console.log('Date validation:', { now, startDate, endDate, valid: now >= startDate && now <= endDate });
+      
+      if (now < startDate || now > endDate) {
+        return res.status(403).json({ error: 'Test access expired or not yet available.' });
+      }
+    } else {
+      console.log('No test link submission found, checking position-based access...');
+      // Fallback to position-based access
+      const position = await require('../models/Position').findOne({ testId: test._id }).lean();
+      if (!position) {
+        console.log('No position found for test');
+        return res.status(404).json({ error: 'Position not found' });
+      }
+      
+      const application = await FormSubmission.findOne({
+        positionId: position._id,
+        applicantId: req.user._id,
+        status: 'shortlisted'
+      }).lean();
+      
+      console.log('Position-based application:', application);
+      
+      if (!application) {
+        return res.status(403).json({ error: 'Access denied. Only shortlisted applicants can take this test.' });
+      }
+    }
+  }
+  
   const questions = test.questions.map(q => {
     const question = q.questionId;
     if (question.type === 'mcq') {
@@ -174,6 +252,7 @@ router.get('/url/:testUrl', async (req, res) => {
       answerType: question.answerType,
     };
   });
+  console.log('Sending successful response with', questions.length, 'questions');
   res.json({ test: { _id: test._id, title: test.title, durationMinutes: test.durationMinutes, questions } });
 });
 

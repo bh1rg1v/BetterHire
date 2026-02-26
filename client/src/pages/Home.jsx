@@ -22,7 +22,15 @@ export default function Home() {
         <p style={s(theme).tagline}>Streamline your recruitment process with custom forms, tests, and analytics</p>
         <div style={s(theme).actions}>
           {user ? (
-            <Link to="/dashboard" style={s(theme).primaryBtn}>Go to Dashboard</Link>
+            user.role === 'SuperAdmin' ? (
+              <Link to="/dashboard/superadmin" style={s(theme).primaryBtn}>Go to Dashboard</Link>
+            ) : user.role === 'Applicant' ? (
+              <Link to="/dashboard/applicant" style={s(theme).primaryBtn}>Go to Dashboard</Link>
+            ) : user.organizationId?.slug ? (
+              <Link to={`/${user.organizationId.slug}/${user.role.toLowerCase()}/dashboard`} style={s(theme).primaryBtn}>Go to Dashboard</Link>
+            ) : (
+              <Link to="/dashboard" style={s(theme).primaryBtn}>Go to Dashboard</Link>
+            )
           ) : (
             <>
               <Link to="/register" style={s(theme).primaryBtn}>Get Started</Link>

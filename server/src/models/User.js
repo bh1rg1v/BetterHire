@@ -61,6 +61,8 @@ userSchema.pre('validate', function (next) {
     next(new Error('Organization is required for Admin role'));
   } else if (this.role === ROLES.APPLICANT && this.organizationId) {
     this.organizationId = undefined;
+  } else if (this.role === ROLES.SUPER_ADMIN && this.organizationId) {
+    this.organizationId = undefined;
   }
   next();
 });

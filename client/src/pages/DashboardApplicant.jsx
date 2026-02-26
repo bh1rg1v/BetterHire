@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Sidebar } from '../components/layout/Sidebar';
@@ -11,6 +11,7 @@ const STATUS_LABELS = { submitted: 'Submitted', under_review: 'Under Review', sh
 export default function DashboardApplicant() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const [submissions, setSubmissions] = useState([]);
   const [attemptsByPosition, setAttemptsByPosition] = useState({});
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,7 @@ export default function DashboardApplicant() {
     cardTitle: { fontSize: '1.25rem', fontWeight: 600, margin: 0 },
     badge: { padding: `${theme.spacing.xs} ${theme.spacing.md}`, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap' },
     cardDate: { color: theme.colors.textMuted, fontSize: '0.875rem', marginBottom: theme.spacing.lg },
-    testBtn: { display: 'inline-flex', alignItems: 'center', gap: theme.spacing.sm, padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, color: '#fff', textDecoration: 'none', fontWeight: 500, transition: 'all 0.2s' },
+    testBtn: { display: 'inline-flex', alignItems: 'center', gap: theme.spacing.sm, padding: `${theme.spacing.md} ${theme.spacing.lg}`, background: theme.colors.primary, color: '#fff', textDecoration: 'none', fontWeight: 500, transition: 'all 0.2s', whiteSpace: 'nowrap' },
     testInfo: { color: theme.colors.textMuted, fontSize: '0.9rem' },
     empty: { textAlign: 'center', padding: theme.spacing.xxl },
     emptyText: { fontSize: '1.25rem', color: theme.colors.textMuted, marginBottom: theme.spacing.lg },
@@ -96,24 +97,57 @@ export default function DashboardApplicant() {
                     <div style={s.cardHeader}>
                       <div>
                         <p style={{ margin: 0, fontSize: '0.875rem', color: theme.colors.textMuted, marginBottom: theme.spacing.xs }}>Company</p>
-                        <h3 style={s.cardTitle}>{sub.positionId?.organizationId?.name || 'N/A'}</h3>
+                        <h3 style={s.cardTitle}>{sub.positionId?.organizationId?.name || sub.formId?.organizationId?.name || 'N/A'}</h3>
                       </div>
                       <span style={{ ...s.badge, background: `${getStatusColor(sub.status)}20`, color: getStatusColor(sub.status) }}>
                         {STATUS_LABELS[sub.status] || sub.status}
                       </span>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: theme.colors.textMuted, marginBottom: theme.spacing.xs }}>Position</p>
-                    <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: 500, marginBottom: theme.spacing.md }}>{sub.positionId?.title || 'N/A'}</p>
+                    <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: 500, marginBottom: theme.spacing.md }}>{sub.positionId?.title || sub.positionFromForm?.title || sub.formId?.name || 'Application'}</p>
                     <p style={s.cardDate}>Applied on {new Date(sub.createdAt).toLocaleDateString()}</p>
                     
                     <div style={{ display: 'flex', gap: theme.spacing.sm, marginBottom: theme.spacing.md }}>
-                      <button onClick={() => window.open(`/dashboard/submissions/${sub._id}`, '_blank')} style={{ ...s.testBtn, background: theme.colors.bgHover, color: theme.colors.text, border: `1px solid ${theme.colors.border}` }}>
+                      <Link to={`/dashboard/submissions/${sub._id}`} style={{ ...s.testBtn, background: theme.colors.bgHover, color: theme.colors.text, border: `1px solid ${theme.colors.border}`, textDecoration: 'none' }}>
                         View Application
-                      </button>
+                      </Link>
+                      {sub.status === 'submitted' && (
+                        <Link to={`/dashboard/submissions/${sub._id}/edit`} style={{ ...s.testBtn, background: theme.colors.primary, color: '#fff', textDecoration: 'none' }}>
+                          Edit Application
+                        </Link>
+                      )}
+                      {sub.status === 'shortlisted' && sub.testLink && (() => {
+                        const now = new Date();
+                        const startDate = new Date(sub.testStartDate);
+                        const endDate = new Date(sub.testEndDate);
+                        const isWithinValidPeriod = now >= startDate && now <= endDate;
+                        return isWithinValidPeriod ? (
+                          <a href={sub.testLink} target="_blank" rel="noopener noreferrer" style={{ ...s.testBtn, background: theme.colors.success, color: '#fff', textDecoration: 'none' }}>
+                            Test Link
+                          </a>
+                        ) : (
+                          <span style={{ ...s.testBtn, background: theme.colors.textMuted, color: '#fff', cursor: 'not-allowed' }}>
+                            Test Unavailable
+                          </span>
+                        );
+                      })()}
                     </div>
-                    {canTakeTest && (
+                    {sub.status === 'shortlisted' && sub.testLink && (
+                      <div style={{ ...s.testInfo, marginBottom: theme.spacing.md }}>
+                        Test valid from {new Date(sub.testStartDate).toLocaleDateString()} to {new Date(sub.testEndDate).toLocaleDateString()}
+                        {(() => {
+                          const now = new Date();
+                          const startDate = new Date(sub.testStartDate);
+                          const endDate = new Date(sub.testEndDate);
+                          if (now < startDate) return <span style={{ color: theme.colors.warning, marginLeft: '8px' }}>(Not yet available)</span>;
+                          if (now > endDate) return <span style={{ color: theme.colors.danger, marginLeft: '8px' }}>(Expired)</span>;
+                          return <span style={{ color: theme.colors.success, marginLeft: '8px' }}>(Active)</span>;
+                        })()} 
+                      </div>
+                    )}
+                    {sub.status === 'shortlisted' && hasTest && canTakeTest && (
                       <Link to={`/test/${posId}`} style={s.testBtn}>
-                        Take Test
+                        Give Test
                       </Link>
                     )}
                     {testDone && (

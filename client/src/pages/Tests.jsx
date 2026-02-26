@@ -2,18 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useOrg } from '../context/OrgContext';
 import { Sidebar } from '../components/layout/Sidebar';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import * as api from '../api/client';
 
 export default function Tests() {
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const { organization } = useOrg();
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
   const canEdit = user?.role === 'Admin' || user?.canPostJobs === true;
+  const orgSlug = organization?.slug;
+  const userRole = user?.role?.toLowerCase();
 
   const load = useCallback(async () => {
     try {
@@ -35,13 +40,11 @@ export default function Tests() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
-  const { theme } = useTheme();
-
-  const navItems = user?.role === 'Admin'
-    ? [{ label: 'Dashboard', path: '/dashboard/admin' }, { label: 'Organization', path: '/dashboard/organization' }, { label: 'Positions', path: '/dashboard/manager' }, { label: 'Forms', path: '/dashboard/forms' }, { label: 'Questions', path: '/dashboard/questions' }, { label: 'Tests', path: '/dashboard/tests' }, { label: 'Analytics', path: '/dashboard/analytics' }, { label: 'Profile', path: '/dashboard/profile' }]
+  const navItems = !orgSlug ? [] : user?.role === 'Admin'
+    ? [{ label: 'Dashboard', path: `/${orgSlug}/admin/dashboard` }, { label: 'Forms', path: `/${orgSlug}/admin/forms` }, { label: 'Questions', path: `/${orgSlug}/admin/questions` }, { label: 'Tests', path: `/${orgSlug}/admin/tests` }, { label: 'Analytics', path: `/${orgSlug}/admin/analytics` }, { label: 'Profile', path: '/dashboard/profile' }]
     : user?.canPostJobs
-    ? [{ label: 'Dashboard', path: '/dashboard/manager' }, { label: 'Positions', path: '/dashboard/manager' }, { label: 'Forms', path: '/dashboard/forms' }, { label: 'Questions', path: '/dashboard/questions' }, { label: 'Tests', path: '/dashboard/tests' }, { label: 'Analytics', path: '/dashboard/analytics' }, { label: 'Profile', path: '/dashboard/profile' }]
-    : [{ label: 'Dashboard', path: '/dashboard/manager' }, { label: 'Profile', path: '/dashboard/profile' }];
+    ? [{ label: 'Dashboard', path: `/${orgSlug}/manager/dashboard` }, { label: 'Forms', path: `/${orgSlug}/manager/forms` }, { label: 'Questions', path: `/${orgSlug}/manager/questions` }, { label: 'Tests', path: `/${orgSlug}/manager/tests` }, { label: 'Analytics', path: `/${orgSlug}/manager/analytics` }, { label: 'Profile', path: '/dashboard/profile' }]
+    : [{ label: 'Dashboard', path: `/${orgSlug}/manager/dashboard` }, { label: 'Profile', path: '/dashboard/profile' }];
 
   if (!canEdit) return <DashboardLayout sidebar={<Sidebar items={navItems} />}><div style={{ padding: '2rem' }}><p>Permission required.</p></div></DashboardLayout>;
 
@@ -69,13 +72,13 @@ export default function Tests() {
     <DashboardLayout sidebar={<Sidebar items={navItems} />}>
       <div style={s.header}>
         <h1 style={s.title}>Tests</h1>
-        <Link to="/dashboard/tests/create" style={s.btn}>Create Test</Link>
+        <Link to={`/${orgSlug}/${userRole}/tests/create`} style={s.btn}>Create Test</Link>
       </div>
       {error && <div style={s.error}>{error}</div>}
       {loading ? <p>Loading...</p> : tests.length === 0 ? (
         <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
           <p style={{ fontSize: '1.25rem', color: theme.colors.textMuted, marginBottom: theme.spacing.lg }}>No tests created yet</p>
-          <Link to="/dashboard/tests/create" style={s.btn}>Create First Test</Link>
+          <Link to={`/${orgSlug}/${userRole}/tests/create`} style={s.btn}>Create First Test</Link>
         </div>
       ) : (
         <ul style={s.list}>
@@ -89,7 +92,7 @@ export default function Tests() {
                 <button type="button" onClick={() => copyTestUrl(t)} style={s.btnEdit}>
                   {copiedId === t._id ? 'Copied!' : 'Copy URL'}
                 </button>
-                <Link to={`/dashboard/tests/${t._id}/edit`} style={s.btnEdit}>Edit</Link>
+                <Link to={`/${orgSlug}/${userRole}/tests/${t._id}/edit`} style={s.btnEdit}>Edit</Link>
               </div>
             </li>
           ))}

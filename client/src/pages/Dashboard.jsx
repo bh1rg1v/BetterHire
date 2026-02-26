@@ -8,28 +8,35 @@ export default function Dashboard() {
   const { theme } = useTheme();
 
   const getNavItems = () => {
-    if (user?.role === 'Admin') {
+    const orgSlug = user?.organizationId?.slug;
+    
+    if (user?.role === 'SuperAdmin') {
       return [
-        { path: '/dashboard', label: 'Dashboard' },
-        { path: '/dashboard/admin', label: 'Organization' },
-        { path: '/dashboard/manager', label: 'Positions' },
-        { path: '/dashboard/forms', label: 'Forms' },
-        { path: '/dashboard/questions', label: 'Questions' },
-        { path: '/dashboard/tests', label: 'Tests' },
-        { path: '/dashboard/analytics', label: 'Analytics' },
+        { path: '/dashboard/superadmin', label: 'Dashboard' },
+        { path: '/dashboard/superadmin/users', label: 'Users' },
+        { path: '/dashboard/superadmin/organizations', label: 'Organizations' },
         { path: '/dashboard/profile', label: 'Profile' },
       ];
     }
-    if (user?.role === 'Manager') {
+    if (user?.role === 'Admin' && orgSlug) {
       return [
-        { path: '/dashboard', label: 'Dashboard' },
-        { path: '/dashboard/manager', label: 'Positions' },
+        { path: `/${orgSlug}/admin/dashboard`, label: 'Dashboard' },
+        { path: `/${orgSlug}/admin/forms`, label: 'Forms' },
+        { path: `/${orgSlug}/admin/questions`, label: 'Questions' },
+        { path: `/${orgSlug}/admin/tests`, label: 'Tests' },
+        { path: `/${orgSlug}/admin/analytics`, label: 'Analytics' },
+        { path: '/dashboard/profile', label: 'Profile' },
+      ];
+    }
+    if (user?.role === 'Manager' && orgSlug) {
+      return [
+        { path: `/${orgSlug}/manager/dashboard`, label: 'Dashboard' },
         ...(user?.canPostJobs ? [
-          { path: '/dashboard/forms', label: 'Forms' },
-          { path: '/dashboard/questions', label: 'Questions' },
-          { path: '/dashboard/tests', label: 'Tests' },
+          { path: `/${orgSlug}/manager/forms`, label: 'Forms' },
+          { path: `/${orgSlug}/manager/questions`, label: 'Questions' },
+          { path: `/${orgSlug}/manager/tests`, label: 'Tests' },
         ] : []),
-        { path: '/dashboard/analytics', label: 'Analytics' },
+        { path: `/${orgSlug}/manager/analytics`, label: 'Analytics' },
         { path: '/dashboard/profile', label: 'Profile' },
       ];
     }
@@ -106,38 +113,44 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout sidebar={<Sidebar items={getNavItems()} />}>
-      <h1 style={styles.title}>Dashboard</h1>
-      <p style={styles.subtitle}>Welcome back, {user?.name}</p>
-      
-      <div style={styles.grid}>
-        <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Role</h3>
-          <p style={styles.cardValue}>{user?.role}</p>
-        </div>
-        
-        {user?.organizationId?.name && (
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}>Organization</h3>
-            <p style={styles.cardValue}>{user.organizationId.name}</p>
+      {!user ? (
+        <p>Loading user data...</p>
+      ) : (
+        <>
+          <h1 style={styles.title}>Dashboard</h1>
+          <p style={styles.subtitle}>Welcome back, {user?.name}</p>
+          
+          <div style={styles.grid}>
+            <div style={styles.card}>
+              <h3 style={styles.cardTitle}>Role</h3>
+              <p style={styles.cardValue}>{user?.role}</p>
+            </div>
+            
+            {user?.organizationId?.name && (
+              <div style={styles.card}>
+                <h3 style={styles.cardTitle}>Organization</h3>
+                <p style={styles.cardValue}>{user.organizationId.name}</p>
+              </div>
+            )}
+            
+            <div style={styles.card}>
+              <h3 style={styles.cardTitle}>Email</h3>
+              <p style={styles.cardValue}>{user?.email}</p>
+            </div>
           </div>
-        )}
-        
-        <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Email</h3>
-          <p style={styles.cardValue}>{user?.email}</p>
-        </div>
-      </div>
 
-      <div style={styles.quickLinks}>
-        <h2 style={styles.sectionTitle}>Quick Links</h2>
-        <div style={styles.linkGrid}>
-          {getNavItems().slice(1).map((item) => (
-            <a key={item.path} href={item.path} style={styles.quickLink}>
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </div>
-      </div>
+          <div style={styles.quickLinks}>
+            <h2 style={styles.sectionTitle}>Quick Links</h2>
+            <div style={styles.linkGrid}>
+              {getNavItems().slice(1).map((item) => (
+                <a key={item.path} href={item.path} style={styles.quickLink}>
+                  <span>{item.label}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </DashboardLayout>
   );
 }

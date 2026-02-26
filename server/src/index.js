@@ -22,6 +22,8 @@ const jobRoutes = require('./routes/jobs');
 const testPublicRoutes = require('./routes/tests');
 const applicationRoutes = require('./routes/applications');
 const analyticsRoutes = require('./routes/analytics');
+const superAdminRoutes = require('./routes/superadmin');
+const orgPublicRoutes = require('./routes/orgPublic');
 
 const app = express();
 
@@ -54,6 +56,8 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/tests', testPublicRoutes);
 app.use('/api/applications', authenticate, applicationRoutes);
 app.use('/api/organizations/me/analytics', authenticate, analyticsRoutes);
+app.use('/api/superadmin', authenticate, superAdminRoutes);
+app.use('/api/organizations', orgPublicRoutes);
 
 // 404
 app.use((req, res) => {

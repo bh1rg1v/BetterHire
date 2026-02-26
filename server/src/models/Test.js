@@ -13,6 +13,8 @@ const testSchema = new mongoose.Schema(
     testUrl: { type: String, required: true, unique: true, trim: true, lowercase: true },
     /** Duration in minutes. 0 = no time limit. */
     durationMinutes: { type: Number, default: 0, min: 0 },
+    /** Maximum attempts allowed. Default is 1. */
+    maxAttempts: { type: Number, default: 1, min: 1 },
     /** Questions in order: [{ questionId, order, points }]. points overrides question.maxScore for this test. */
     questions: [
       {

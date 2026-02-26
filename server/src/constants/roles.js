@@ -5,6 +5,7 @@
  * Applicant = candidate (apply, tests, track progress).
  */
 const ROLES = Object.freeze({
+  SUPER_ADMIN: 'SuperAdmin',
   ADMIN: 'Admin',
   MANAGER: 'Manager',
   APPLICANT: 'Applicant',

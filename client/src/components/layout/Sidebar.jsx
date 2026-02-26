@@ -69,21 +69,19 @@ export function Sidebar({ items }) {
             {item.label}
           </Link>
         ))}
-        <div style={{ marginTop: 'auto' }}>
-          {items.slice(-1).map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              style={{
-                ...styles.link,
-                ...(location.pathname === item.path ? styles.linkActive : {}),
-              }}
-            >
-              {item.icon && <span style={styles.icon}>{item.icon}</span>}
-              {item.label}
-            </Link>
-          ))}
-        </div>
+        {items.length > 0 && (
+          <Link
+            to={items[items.length - 1].path}
+            style={{
+              ...styles.link,
+              ...(location.pathname === items[items.length - 1].path ? styles.linkActive : {}),
+              marginTop: 'auto',
+            }}
+          >
+            {items[items.length - 1].icon && <span style={styles.icon}>{items[items.length - 1].icon}</span>}
+            {items[items.length - 1].label}
+          </Link>
+        )}
       </nav>
     </aside>
   );

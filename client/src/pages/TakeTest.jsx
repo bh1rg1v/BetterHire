@@ -1,304 +1,313 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import * as api from '../api/client';
 
 export default function TakeTest() {
-  const { positionId, testUrl, questionId } = useParams();
-  const navigate = useNavigate();
+  const { testUrl, questionId } = useParams();
   const { user } = useAuth();
-  const [attempt, setAttempt] = useState(null);
+  const { theme } = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [test, setTest] = useState(null);
-  const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [answers, setAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(null);
-  const [ended, setEnded] = useState(false);
-  const [isPreview, setIsPreview] = useState(!!testUrl);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [questionStatus, setQuestionStatus] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const durationMs = test?.durationMinutes ? test.durationMinutes * 60 * 1000 : 0;
-  const startedAt = attempt?.startedAt ? new Date(attempt.startedAt).getTime() : null;
+  const isTakingTest = location.pathname.includes('/take');
 
   useEffect(() => {
-    if (testUrl) {
-      setIsPreview(true);
-      api.api(`/tests/url/${testUrl}`, { auth: false })
-        .then((r) => {
-          setTest(r.test);
-          const initial = {};
-          (r.test?.questions || []).forEach((q) => {
-            initial[q._id] = '';
-          });
-          setAnswers(initial);
-          const statusInit = {};
-          (r.test?.questions || []).forEach((q) => {
-            statusInit[q._id] = 'not_visited';
-          });
-          setQuestionStatus(statusInit);
-          if (questionId && r.test?.questions) {
-            const idx = r.test.questions.findIndex(q => q._id === questionId);
-            if (idx >= 0) setCurrentQuestionIndex(idx);
-          }
-        })
-        .catch((e) => setError(e.message || 'Test not found'))
-        .finally(() => setLoading(false));
-      return;
+    async function loadTest() {
+      try {
+        const res = await api.api(`/tests/url/${testUrl}${questionId ? `?questionId=${questionId}` : ''}`, { auth: false });
+        setTest(res.test);
+        if (res.test.durationMinutes && isTakingTest) {
+          setTimeLeft(res.test.durationMinutes * 60);
+        }
+      } catch (e) {
+        setError(e.message || 'Test not found');
+      } finally {
+        setLoading(false);
+      }
     }
-    if (!user || user.role !== 'Applicant' || !positionId) {
-      navigate('/dashboard/applicant');
-      return;
-    }
-    api.api(`/attempts/me?positionId=${positionId}`)
-      .then((r) => {
-        setAttempt(r.attempt);
-        setTest(r.test);
-        const initial = {};
-        (r.test?.questions || []).forEach((q) => {
-          const qid = q.questionId?._id || q.questionId;
-          if (qid) initial[qid] = r.attempt?.answers?.find((a) => (a.questionId || a.questionId?._id) === qid)?.value ?? '';
-        });
-        setAnswers(initial);
-      })
-      .catch(() => {
-        api.api('/attempts/start', { method: 'POST', body: { positionId } })
-          .then((r) => {
-            setAttempt(r.attempt);
-            setTest(r.test);
-            const initial = {};
-            (r.test?.questions || []).forEach((q) => {
-              const qid = q.questionId?._id || q.questionId;
-              if (qid) initial[qid] = '';
-            });
-            setAnswers(initial);
-          })
-          .catch((e) => setError(e.message || 'Failed to start'));
-      })
-      .finally(() => setLoading(false));
-  }, [positionId, testUrl, questionId, user, navigate]);
+    loadTest();
+  }, [testUrl, questionId, isTakingTest]);
 
   useEffect(() => {
-    if (!durationMs || !startedAt || attempt?.status !== 'in_progress') return;
-    const tick = () => {
-      const elapsed = Date.now() - startedAt;
-      const left = Math.max(0, durationMs - elapsed);
-      setTimeLeft(left);
-      if (left <= 0) setEnded(true);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [durationMs, startedAt, attempt?.status]);
+    if (timeLeft === null || timeLeft <= 0 || !isTakingTest) return;
+    
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          handleSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-  const setAnswer = useCallback((questionId, value) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: value }));
-    setQuestionStatus((prev) => ({
-      ...prev,
-      [questionId]: value ? (prev[questionId] === 'marked' ? 'marked' : 'answered') : 'unanswered'
-    }));
-  }, []);
+    return () => clearInterval(timer);
+  }, [timeLeft, isTakingTest]);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!attempt?._id) return;
+  const handleAnswerChange = (questionId, value) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const handleSubmit = async () => {
+    if (submitting) return;
     setSubmitting(true);
-    setError('');
+    
     try {
-      const answersArr = Object.entries(answers).map(([questionId, value]) => ({ questionId, value }));
-      await api.api(`/attempts/${attempt._id}/submit`, { method: 'POST', body: { answers: answersArr } });
-      navigate('/dashboard/applicant');
+      alert('Test submitted successfully!');
+      navigate(`/test/${testUrl}`);
     } catch (e) {
-      setError(e.message || 'Submit failed');
+      setError(e.message || 'Failed to submit test');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const styles = {
+    page: {
+      minHeight: '100vh',
+      background: theme.colors.bg,
+      color: theme.colors.text,
+      fontFamily: theme.fonts.body,
+      padding: theme.spacing.xl,
+    },
+    container: {
+      maxWidth: '800px',
+      margin: '0 auto',
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.xl,
+      padding: theme.spacing.lg,
+      background: theme.colors.bgCard,
+      border: `1px solid ${theme.colors.border}`,
+    },
+    title: {
+      fontSize: '2rem',
+      fontWeight: 600,
+      margin: 0,
+    },
+    timer: {
+      fontSize: '1.5rem',
+      fontWeight: 600,
+      color: timeLeft < 300 ? theme.colors.danger : theme.colors.primary,
+    },
+    error: {
+      color: theme.colors.danger,
+      padding: theme.spacing.md,
+      background: `${theme.colors.danger}20`,
+      border: `1px solid ${theme.colors.danger}`,
+      marginBottom: theme.spacing.lg,
+    },
+    question: {
+      background: theme.colors.bgCard,
+      padding: theme.spacing.xl,
+      border: `1px solid ${theme.colors.border}`,
+      marginBottom: theme.spacing.lg,
+    },
+    questionTitle: {
+      fontSize: '1.25rem',
+      fontWeight: 600,
+      marginBottom: theme.spacing.md,
+    },
+    questionText: {
+      fontSize: '1.1rem',
+      marginBottom: theme.spacing.lg,
+      lineHeight: 1.6,
+    },
+    option: {
+      display: 'flex',
+      alignItems: 'center',
+      marginBottom: theme.spacing.sm,
+      padding: theme.spacing.sm,
+      cursor: 'pointer',
+    },
+    radio: {
+      marginRight: theme.spacing.sm,
+    },
+    textarea: {
+      width: '100%',
+      minHeight: '120px',
+      padding: theme.spacing.md,
+      background: theme.colors.bg,
+      border: `1px solid ${theme.colors.border}`,
+      color: theme.colors.text,
+      fontFamily: theme.fonts.body,
+      fontSize: '1rem',
+      resize: 'vertical',
+    },
+    button: {
+      padding: `${theme.spacing.md} ${theme.spacing.xl}`,
+      background: theme.colors.primary,
+      color: '#fff',
+      border: 'none',
+      cursor: 'pointer',
+      fontFamily: theme.fonts.body,
+      fontWeight: 600,
+      fontSize: '1rem',
+      marginRight: theme.spacing.md,
+    },
+    buttonSecondary: {
+      padding: `${theme.spacing.md} ${theme.spacing.xl}`,
+      background: 'transparent',
+      color: theme.colors.text,
+      border: `1px solid ${theme.colors.border}`,
+      cursor: 'pointer',
+      fontFamily: theme.fonts.body,
+      fontWeight: 600,
+      fontSize: '1rem',
+    },
+    actions: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: theme.spacing.xl,
+      padding: theme.spacing.lg,
+      background: theme.colors.bgCard,
+      border: `1px solid ${theme.colors.border}`,
+    },
+  };
+
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.container}>
+          <p>Loading test...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (loading) return <div style={s.page}><p>Loading…</p></div>;
-  if (error && !test) return <div style={s.page}><p style={s.error}>{error}</p><a href="/dashboard">Back</a></div>;
-  if (!isPreview && attempt?.status !== 'in_progress') return <div style={s.page}><p>This test is already submitted or evaluated.</p><a href="/dashboard/applicant">Back to applications</a></div>;
-
-  const questions = test?.questions || [];
-  const currentQuestion = questions[currentQuestionIndex];
-  const qn = currentQuestion?.questionId || currentQuestion;
-  const qid = qn?._id;
-  const timeStr = timeLeft != null ? `${Math.floor(timeLeft / 60)}:${String(Math.floor((timeLeft % 60) / 1)).padStart(2, '0')}` : '—';
-
-  function goToNext() {
-    if (currentQuestionIndex < questions.length - 1) {
-      const nextIdx = currentQuestionIndex + 1;
-      setCurrentQuestionIndex(nextIdx);
-      if (testUrl) {
-        navigate(`/test/${testUrl}/${questions[nextIdx]._id}`, { replace: true });
-      }
-    }
+  if (error) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.container}>
+          <div style={styles.error}>{error}</div>
+          <button onClick={() => navigate('/')} style={styles.button}>
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
   }
 
-  function goToPrev() {
-    if (currentQuestionIndex > 0) {
-      const prevIdx = currentQuestionIndex - 1;
-      setCurrentQuestionIndex(prevIdx);
-      if (testUrl) {
-        navigate(`/test/${testUrl}/${questions[prevIdx]._id}`, { replace: true });
-      }
-    }
-  }
+  if (!isTakingTest) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.container}>
+          <h1 style={styles.title}>{test?.title || 'Test'}</h1>
+          
+          <div style={styles.question}>
+            <h3>Test Information</h3>
+            <p><strong>Duration:</strong> {test?.durationMinutes ? `${test.durationMinutes} minutes` : 'No time limit'}</p>
+            <p><strong>Questions:</strong> {test?.questionsCount || test?.questions?.length || 0}</p>
+            {test?.attemptsCount !== undefined && (
+              <p><strong>Your attempts:</strong> {test.attemptsCount} / {test.maxAttempts || 1}</p>
+            )}
+          </div>
 
-  function goToQuestion(idx) {
-    setCurrentQuestionIndex(idx);
-    if (testUrl) {
-      navigate(`/test/${testUrl}/${questions[idx]._id}`, { replace: true });
-    }
-  }
-
-  function markForReview() {
-    setQuestionStatus(prev => ({ ...prev, [qid]: 'marked' }));
-  }
-
-  function saveAndNext() {
-    goToNext();
-  }
-
-  function saveMarkAndNext() {
-    setQuestionStatus(prev => ({ ...prev, [qid]: 'marked' }));
-    goToNext();
-  }
-
-  const mcqQuestions = questions.filter(q => (q.questionId || q).type === 'mcq');
-  const fillblankQuestions = questions.filter(q => (q.questionId || q).type === 'fillblank');
-
-  function getStatusColor(status) {
-    switch(status) {
-      case 'answered': return '#22c55e';
-      case 'marked': return '#f59e0b';
-      case 'unanswered': return '#ef4444';
-      case 'not_visited': return '#64748b';
-      default: return '#64748b';
-    }
+          <div style={styles.actions}>
+            <button onClick={() => navigate(-1)} style={styles.buttonSecondary}>
+              Back
+            </button>
+            <button onClick={() => navigate(`/test/${testUrl}/take`)} style={styles.button}>
+              Start Test
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={s.page}>
-      <div style={s.mainContainer}>
-        <div style={s.container}>
-          {isPreview && <div style={s.previewBanner}>PREVIEW MODE</div>}
-          <h1>{test?.title} — Test</h1>
-          {durationMs > 0 && !isPreview && <p style={s.timer}>Time left: <strong>{timeStr}</strong></p>}
-          {isPreview && durationMs > 0 && <p style={s.timer}>Duration: <strong>{test.durationMinutes} minutes</strong></p>}
-          <div style={s.progress}>Question {currentQuestionIndex + 1} of {questions.length}</div>
-          {error && <p style={s.error}>{error}</p>}
-          {qn && (
-            <div style={s.question}>
-              <p><strong>Q{currentQuestionIndex + 1}.</strong> {qn.questionText} {qn.maxScore ? `(${qn.maxScore} pt)` : ''}</p>
-              {qn.type === 'mcq' && (qn.options || []).map((opt, i) => (
-                <label key={i} style={s.option}>
-                  <input type="radio" name={qid} value={i} checked={answers[qid] === i || answers[qid] === String(i)} onChange={() => setAnswer(qid, i)} disabled={isPreview} />
-                  {opt.text}
-                </label>
-              ))}
-              {qn.type === 'fillblank' && (
-                <input type="text" value={answers[qid] || ''} onChange={(e) => setAnswer(qid, e.target.value)} style={s.textarea} placeholder="Your answer" disabled={isPreview} />
-              )}
-              {qn.type === 'descriptive' && (
-                <textarea value={answers[qid] || ''} onChange={(e) => setAnswer(qid, e.target.value)} rows={4} style={s.textarea} disabled={isPreview} />
-              )}
+    <div style={styles.page}>
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>{test?.title || 'Test'}</h1>
+          {timeLeft !== null && (
+            <div style={styles.timer}>
+              Time Left: {formatTime(timeLeft)}
             </div>
           )}
-          {!isPreview && (
-            <div style={s.actions}>
-              <button type="button" onClick={markForReview} style={s.actionBtn}>Mark for Review</button>
-              <button type="button" onClick={saveAndNext} style={s.actionBtn}>Save & Next</button>
-              <button type="button" onClick={saveMarkAndNext} style={s.actionBtn}>Save & Mark for Review</button>
-            </div>
-          )}
-          <div style={s.navigation}>
-            {currentQuestionIndex > 0 && <button type="button" onClick={goToPrev} style={s.navBtn}>← Previous</button>}
-            {currentQuestionIndex < questions.length - 1 ? (
-              <button type="button" onClick={goToNext} style={s.navBtn}>Next →</button>
-            ) : (
-              !isPreview && <button type="button" onClick={handleSubmit} disabled={submitting} style={s.btn}>{submitting ? 'Submitting…' : 'Submit test'}</button>
-            )}
-          </div>
         </div>
-        <div style={s.sidebar}>
-          <h3 style={s.sidebarTitle}>Questions</h3>
-          <div style={s.legend}>
-            <div style={s.legendItem}><span style={{...s.legendBox, background: '#22c55e'}}></span> Answered</div>
-            <div style={s.legendItem}><span style={{...s.legendBox, background: '#f59e0b'}}></span> Marked</div>
-            <div style={s.legendItem}><span style={{...s.legendBox, background: '#ef4444'}}></span> Unanswered</div>
-            <div style={s.legendItem}><span style={{...s.legendBox, background: '#64748b'}}></span> Not Visited</div>
+
+        {error && <div style={styles.error}>{error}</div>}
+
+        {test?.questions && test.questions.length > 0 ? (
+          <div>
+            {test.questions.map((q, index) => {
+              const question = q.questionId || q;
+              const questionId = question._id;
+              
+              return (
+                <div key={questionId} style={styles.question}>
+                  <h4 style={styles.questionTitle}>Question {index + 1}</h4>
+                  <p style={styles.questionText}>{question.questionText}</p>
+                  
+                  {question.type === 'mcq' && question.options && (
+                    <div>
+                      {question.options.map((option, optIndex) => (
+                        <label key={optIndex} style={styles.option}>
+                          <input
+                            type="radio"
+                            name={`q${questionId}`}
+                            value={optIndex}
+                            checked={answers[questionId] == optIndex}
+                            onChange={(e) => handleAnswerChange(questionId, parseInt(e.target.value))}
+                            style={styles.radio}
+                          />
+                          {option.text}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {question.type === 'descriptive' && (
+                    <textarea
+                      placeholder="Your answer..."
+                      value={answers[questionId] || ''}
+                      onChange={(e) => handleAnswerChange(questionId, e.target.value)}
+                      style={styles.textarea}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
-          {mcqQuestions.length > 0 && (
-            <div style={s.questionGroup}>
-              <h4 style={s.groupTitle}>MCQs</h4>
-              <div style={s.questionGrid}>
-                {mcqQuestions.map((q, idx) => {
-                  const qId = (q.questionId || q)._id;
-                  const globalIdx = questions.findIndex(qu => (qu.questionId || qu)._id === qId);
-                  return (
-                    <button
-                      key={qId}
-                      onClick={() => goToQuestion(globalIdx)}
-                      style={{...s.questionBtn, background: getStatusColor(questionStatus[qId] || 'not_visited'), border: globalIdx === currentQuestionIndex ? '2px solid #fff' : 'none'}}
-                    >
-                      {idx + 1}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {fillblankQuestions.length > 0 && (
-            <div style={s.questionGroup}>
-              <h4 style={s.groupTitle}>Blanks</h4>
-              <div style={s.questionGrid}>
-                {fillblankQuestions.map((q, idx) => {
-                  const qId = (q.questionId || q)._id;
-                  const globalIdx = questions.findIndex(qu => (qu.questionId || qu)._id === qId);
-                  return (
-                    <button
-                      key={qId}
-                      onClick={() => goToQuestion(globalIdx)}
-                      style={{...s.questionBtn, background: getStatusColor(questionStatus[qId] || 'not_visited'), border: globalIdx === currentQuestionIndex ? '2px solid #fff' : 'none'}}
-                    >
-                      {idx + 1}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+        ) : (
+          <div style={styles.question}>
+            <p>No questions available for this test.</p>
+          </div>
+        )}
+
+        <div style={styles.actions}>
+          <button onClick={() => navigate(`/test/${testUrl}`)} style={styles.buttonSecondary}>
+            Back to Overview
+          </button>
+          <button 
+            onClick={handleSubmit} 
+            disabled={submitting}
+            style={styles.button}
+          >
+            {submitting ? 'Submitting...' : 'Submit Test'}
+          </button>
         </div>
       </div>
     </div>
   );
 }
-
-const s = {
-  page: { minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', padding: '2rem', fontFamily: 'system-ui, -apple-system, sans-serif' },
-  mainContainer: { display: 'flex', gap: '2rem', maxWidth: '1400px', margin: '0 auto' },
-  container: { flex: 1, maxWidth: 900, background: 'rgba(255, 255, 255, 0.95)', borderRadius: 16, padding: '2rem', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', color: '#1e293b' },
-  sidebar: { width: 320, background: 'rgba(255, 255, 255, 0.95)', padding: '1.5rem', borderRadius: 16, height: 'fit-content', position: 'sticky', top: '2rem', boxShadow: '0 10px 30px rgba(0,0,0,0.2)', color: '#1e293b' },
-  sidebarTitle: { margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: 700, color: '#667eea' },
-  legend: { marginBottom: '1.5rem', fontSize: '0.875rem', padding: '1rem', background: '#f8fafc', borderRadius: 8 },
-  legendItem: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' },
-  legendBox: { width: 18, height: 18, borderRadius: 4, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
-  questionGroup: { marginBottom: '1.5rem' },
-  groupTitle: { margin: '0 0 0.75rem 0', fontSize: '1rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' },
-  questionGrid: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' },
-  questionBtn: { padding: '0.75rem', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.95rem', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
-  previewBanner: { background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', color: '#000', padding: '0.75rem 1.5rem', marginBottom: '1.5rem', borderRadius: 12, fontWeight: 700, textAlign: 'center', fontSize: '1.1rem', boxShadow: '0 4px 12px rgba(251,191,36,0.4)' },
-  timer: { color: '#667eea', marginBottom: '1.5rem', fontSize: '1.1rem', fontWeight: 600, padding: '1rem', background: '#f1f5f9', borderRadius: 8, textAlign: 'center' },
-  progress: { color: '#64748b', marginBottom: '1.5rem', fontSize: '0.95rem', fontWeight: 500 },
-  error: { color: '#ef4444', background: '#fee2e2', padding: '1rem', borderRadius: 8, marginBottom: '1rem' },
-  question: { marginBottom: '2rem', padding: '1.5rem', background: '#f8fafc', borderRadius: 12, border: '2px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
-  option: { display: 'block', marginBottom: '0.75rem', padding: '0.75rem', background: '#fff', borderRadius: 8, cursor: 'pointer', transition: 'all 0.2s', border: '2px solid #e2e8f0' },
-  textarea: { width: '100%', padding: '1rem', marginTop: '0.75rem', background: '#fff', color: '#1e293b', border: '2px solid #e2e8f0', borderRadius: 8, fontSize: '1rem', fontFamily: 'inherit', resize: 'vertical' },
-  actions: { display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' },
-  actionBtn: { padding: '0.75rem 1.25rem', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.95rem', fontWeight: 600, transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(102,126,234,0.3)' },
-  navigation: { display: 'flex', gap: '1rem', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '2rem', borderTop: '2px solid #e2e8f0' },
-  navBtn: { padding: '1rem 2rem', background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: '1rem', fontWeight: 600, transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(100,116,139,0.3)' },
-  btn: { padding: '1rem 2rem', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: '1rem', fontWeight: 700, transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(34,197,94,0.4)' },
-};

@@ -14,7 +14,7 @@ export function DashboardLayout({ children, sidebar }) {
     },
     main: {
       flex: 1,
-      marginLeft: theme.sidebar.width,
+      marginLeft: sidebar ? theme.sidebar.width : 0,
       display: 'flex',
       flexDirection: 'column',
     },
